@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SLO Spinnenweb van Van den Akker - Interactieve Reflectietool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Work+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- jsPDF library voor PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <style>
+        /* ============================================
+           CSS VARIABELEN & BASIS STYLING
+           ============================================ */
+        :root {
+            --color-bg: #fafaf8;
+            --color-surface: #ffffff;
+            --color-text-primary: #2d2d2d;
+            --color-text-secondary: #666666;
+            --color-accent: #b89968;
+            --color-vision: #2c5278;
+            --color-score-high: #2d8659;
+            --color-score-medium: #d68430;
+            --color-score-low: #c94545;
+            --color-border: #e0ddd8;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 2rem 1rem;
+        }
+
+        /* ============================================
+           TYPOGRAFIE
+           ============================================ */
+        h1, h2, h3 {
+            font-family: 'Crimson Pro', Georgia, serif;
+            font-weight: 600;
+        }
+
+        h1 {
+            font-size: clamp(2rem, 5vw, 3rem);
+            color: var(--color-vision);
+            text-align: center;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--color-text-secondary);
+            font-size: 1.1rem;
+            font-weight: 300;
+            margin-bottom: 3rem;
+            font-style: italic;
+        }
+
+        /* ============================================
+           CONTAINER & LAYOUT
+           ============================================ */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ============================================
+           VISIE SECTIE (Centrum)
+           ============================================ */
+        .vision-section {
+            background: var(--color-vision);
+            padding: 1.75rem;
+            border-radius: 2px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 2rem;
+            border-left: 3px solid var(--color-accent);
+        }
+
+        .vision-section h2 {
+            color: white;
+            font-size: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .vision-section .question {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            font-style: italic;
+        }
+
+        .vision-input {
+            width: 100%;
+            padding: 0.875rem;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 2px;
+            font-family: 'Work Sans', sans-serif;
+            font-size: 1rem;
+            background: rgba(255, 255, 255, 0.97);
+            color: var(--color-text-primary);
+            transition: border-color 0.2s ease;
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .vision-input:focus {
+            outline: none;
+            border-color: var(--color-accent);
+            background: white;
+        }
+
+        /* ============================================
+           INVOER SECTIE
+           ============================================ */
+        .input-section {
+            background: var(--color-surface);
+            padding: 1.75rem;
+            border-radius: 2px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .input-section h2 {
+            color: var(--color-vision);
+            font-size: 1.4rem;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .thread-item {
+            margin-bottom: 1.5rem;
+            padding: 1.25rem;
+            background: #fafaf9;
+            border-radius: 2px;
+            border-left: 2px solid var(--color-accent);
+            transition: border-color 0.2s ease;
+        }
+
+        .thread-item:hover {
+            border-left-color: var(--color-vision);
+        }
+
+        .thread-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .thread-title {
+            font-family: 'Crimson Pro', serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
+
+        .thread-question {
+            font-size: 0.9rem;
+            color: var(--color-text-secondary);
+            font-style: italic;
+            margin-top: 0.25rem;
+        }
+
+        .score-control {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .score-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--color-text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .score-button {
+            flex: 1;
+            padding: 0.625rem;
+            border: 1px solid var(--color-border);
+            background: white;
+            border-radius: 2px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: border-color 0.2s ease, background-color 0.2s ease;
+            color: var(--color-text-secondary);
+        }
+
+        .score-button:hover {
+            border-color: var(--color-accent);
+        }
+
+        .score-button.active {
+            background: var(--color-accent);
+            color: white;
+            border-color: var(--color-accent);
+        }
+
+        .score-button.active.score-1,
+        .score-button.active.score-2 {
+            background: var(--color-score-low);
+            border-color: var(--color-score-low);
+        }
+
+        .score-button.active.score-3 {
+            background: var(--color-score-medium);
+            border-color: var(--color-score-medium);
+        }
+
+        .score-button.active.score-4,
+        .score-button.active.score-5 {
+            background: var(--color-score-high);
+            border-color: var(--color-score-high);
+        }
+
+        .thread-notes {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--color-border);
+            border-radius: 2px;
+            font-family: 'Work Sans', sans-serif;
+            font-size: 0.95rem;
+            min-height: 80px;
+            resize: vertical;
+            transition: border-color 0.2s ease;
+        }
+
+        .thread-notes:focus {
+            outline: none;
+            border-color: var(--color-accent);
+        }
+
+        /* ============================================
+           VISUALISATIE SECTIE
+           ============================================ */
+        .visualization-section {
+            background: var(--color-surface);
+            padding: 1.75rem;
+            border-radius: 2px;
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 2rem;
+            align-self: flex-start;
+        }
+
+        .visualization-section h2 {
+            color: var(--color-vision);
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        
+        @media (max-width: 1024px) {
+            .visualization-section {
+                position: relative;
+                top: 0;
+            }
+        }
+
+        #spiderWebContainer {
+            width: 100%;
+            height: 420px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        #spiderWebSVG {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        /* ============================================
+           EXPORT KNOPPEN
+           ============================================ */
+        .export-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 0.625rem 1rem;
+            border: 1px solid;
+            border-radius: 2px;
+            font-family: 'Work Sans', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            text-align: center;
+            background: white;
+        }
+
+        .btn-primary {
+            background: var(--color-vision);
+            color: white;
+            border-color: var(--color-vision);
+        }
+
+        .btn-primary:hover {
+            background: #234059;
+            border-color: #234059;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--color-vision);
+            border-color: var(--color-border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--color-vision);
+        }
+
+        /* ============================================
+           LEGENDA
+           ============================================ */
+        .legend {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: #fafaf9;
+            border-radius: 2px;
+            border: 1px solid var(--color-border);
+        }
+
+        .legend h3 {
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+            color: var(--color-text-primary);
+        }
+
+        .legend-items {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8125rem;
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 1px;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+        }
+
+        /* ============================================
+           PRINT STYLING
+           ============================================ */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .container {
+                max-width: 100%;
+            }
+            
+            .main-grid {
+                display: block;
+            }
+            
+            .visualization-section {
+                position: relative;
+                top: 0;
+                page-break-before: always;
+                box-shadow: none;
+                border: 1px solid #ccc;
+            }
+            
+            .input-section {
+                page-break-after: always;
+            }
+            
+            .export-buttons {
+                display: none;
+            }
+            
+            .thread-item {
+                page-break-inside: avoid;
+                box-shadow: none;
+                border: 1px solid #e0ddd8;
+            }
+            
+            .score-button:not(.active) {
+                background: #f5f5f5;
+            }
+            
+            .subtitle {
+                margin-bottom: 1rem;
+            }
+        }
+
+        /* ============================================
+           TOOLTIP STYLING
+           ============================================ */
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.92);
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 2px;
+            font-size: 0.8125rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            z-index: 1000;
+            max-width: 250px;
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+        }
+
+        /* ============================================
+           AUTO-SAVE NOTIFICATIE
+           ============================================ */
+        .auto-save-indicator {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--color-score-high);
+            color: white;
+            padding: 0.625rem 1rem;
+            border-radius: 2px;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            box-shadow: var(--shadow-sm);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .auto-save-indicator.visible {
+            opacity: 1;
+        }
+
+        .auto-save-indicator::before {
+            content: '✓ ';
+            font-weight: bold;
+        }
+
+        /* Screen reader only content */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Reflectieve Samenvatting */
+        .reflective-summary {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: #fafaf9;
+            border-radius: 2px;
+            border: 1px solid var(--color-border);
+        }
+
+        .reflective-title {
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+            color: var(--color-text-primary);
+        }
+
+        .reflective-items {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .reflective-item {
+            padding: 0.5rem;
+            background: white;
+            border-radius: 2px;
+            border-left: 2px solid var(--color-score-medium);
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+        }
+
+        .reflective-item:hover {
+            border-left-color: var(--color-vision);
+        }
+
+        .reflective-item-title {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--color-text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .reflective-item-notes {
+            font-size: 0.75rem;
+            color: var(--color-text-secondary);
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header role="banner">
+            <h1>SLO Spinnenweb van Van den Akker</h1>
+            <p class="subtitle">Interactieve Reflectietool voor Curriculumontwikkeling</p>
+        </header>
+
+        <!-- Visie Sectie (Centrum van het Spinnenweb) -->
+        <section class="vision-section" aria-labelledby="vision-heading">
+            <h2 id="vision-heading">Visie (Centrum)</h2>
+            <p class="question" id="vision-question">Waartoe leren zij?</p>
+            <textarea 
+                id="visionInput" 
+                class="vision-input" 
+                placeholder="Beschrijf hier je visie op onderwijs en leren. Wat is het overkoepelende doel? Waarom is dit leren belangrijk?"
+                aria-describedby="vision-question"
+                aria-label="Visie op onderwijs en leren"
+            ></textarea>
+        </section>
+
+        <!-- Hoofdgrid: Invoer & Visualisatie -->
+        <main class="main-grid" role="main">
+            <!-- Linker kolom: Invoervelden voor de 9 draden -->
+            <section class="input-section" aria-labelledby="input-heading">
+                <h2 id="input-heading">Curriculumcomponenten (9 Draden)</h2>
+                <div id="threadsContainer" role="group" aria-label="Curriculumcomponenten scores en notities"></div>
+            </section>
+
+            <!-- Rechter kolom: Spinnenweb Visualisatie -->
+            <aside class="visualization-section" aria-labelledby="viz-heading">
+                <h2 id="viz-heading">Spinnenweb Visualisatie</h2>
+                <div id="spiderWebContainer" role="img" aria-label="Spinnenweb diagram met scores voor curriculumcomponenten">
+                    <svg id="spiderWebSVG" viewBox="0 0 600 600" aria-hidden="true"></svg>
+                </div>
+
+                <!-- Legenda -->
+                <div class="legend" aria-labelledby="legend-heading">
+                    <h3 id="legend-heading">Legenda</h3>
+                    <div class="legend-items" role="list">
+                        <div class="legend-item" role="listitem">
+                            <div class="legend-color" style="background: var(--color-score-high);" aria-hidden="true"></div>
+                            <span>Sterk (4-5)</span>
+                        </div>
+                        <div class="legend-item" role="listitem">
+                            <div class="legend-color" style="background: var(--color-score-medium);" aria-hidden="true"></div>
+                            <span>Aandacht (3)</span>
+                        </div>
+                        <div class="legend-item" role="listitem">
+                            <div class="legend-color" style="background: var(--color-score-low);" aria-hidden="true"></div>
+                            <span>Zwak (1-2)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reflectieve Samenvatting -->
+                <div id="reflectiveSummary" class="reflective-summary" style="display: none;" aria-labelledby="reflective-heading">
+                    <h3 id="reflective-heading" class="reflective-title">Componenten die aandacht vragen</h3>
+                    <div id="reflectiveItems" class="reflective-items" role="list"></div>
+                </div>
+
+                <!-- Export Knoppen -->
+                <div class="export-buttons" role="group" aria-label="Export en beheer opties">
+                    <button class="btn btn-primary" onclick="exportAsPNG()" aria-label="Exporteer visualisatie als PNG afbeelding">Export PNG</button>
+                    <button class="btn btn-primary" onclick="exportAsPDF()" aria-label="Exporteer rapport als PDF document">Export PDF</button>
+                    <button class="btn btn-secondary" onclick="window.print()" aria-label="Print pagina">Printen</button>
+                    <button class="btn btn-secondary" onclick="exportAsJSON()" aria-label="Sla gegevens op als JSON bestand">Opslaan</button>
+                    <button class="btn btn-secondary" onclick="loadFromJSON()" aria-label="Laad gegevens uit JSON bestand">Laden</button>
+                    <button class="btn btn-secondary" onclick="clearAllData()" style="background: #ffebee; color: #c94545; border-color: #c94545;" aria-label="Wis alle gegevens">Wissen</button>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Tooltip element -->
+    <div id="tooltip" class="tooltip" role="tooltip" aria-live="polite"></div>
+
+    <!-- Auto-save indicator -->
+    <div id="autoSaveIndicator" class="auto-save-indicator" role="status" aria-live="polite" aria-atomic="true">Automatisch opgeslagen</div>
+
+    <!-- Hidden file input voor JSON import -->
+    <input type="file" id="jsonFileInput" accept=".json" style="display: none;">
+
+    <script>
+        // ============================================
+        // DATA STRUCTUUR: SLO-model draden
+        // ============================================
+        const threads = [
+            {
+                id: 'goals',
+                title: 'Leerdoelen',
+                question: 'Waarheen leren zij?',
+                score: 3,
+                notes: ''
+            },
+            {
+                id: 'content',
+                title: 'Leerinhoud',
+                question: 'Wat leren zij?',
+                score: 3,
+                notes: ''
+            },
+            {
+                id: 'activities',
+                title: 'Leeractiviteiten',
+                question: 'Hoe leren zij?',
+                score: 3,
+                notes: ''
+            },
+            {
+                id: 'teacher',
+                title: 'Docentenrollen',
+                question: 'Wat is de rol van de leraar bij hun leren?',
+                score: 3,
+                notes: ''
+            },
+            {
+                id: 'resources',
+                title: 'Bronnen en materialen',
+                question: 'Waarmee leren zij?',
+                score: 3,
+                notes: ''
+            },
+            {
+                id: 'grouping',
+                title: 'Groeperingsvormen',
+                question: 'Met wie leren zij?',
+                score: 3,
+                notes: ''
+            },
+            {
+                id: 'location',
+                title: 'Leeromgeving',
+                question: 'Waar leren zij?',
+                score: 3,
+                notes: ''
+            },
+            {
+                id: 'time',
+                title: 'Tijd',
+                question: 'Wanneer leren zij?',
+                score: 3,
+                notes: ''
+            },
+            {
+                id: 'assessment',
+                title: 'Toetsing',
+                question: 'Hoe wordt hun leren getoetst?',
+                score: 3,
+                notes: ''
+            }
+        ];
+
+        let visionText = '';
+        let autoSaveTimeout = null;
+
+        // ============================================
+        // LOCALSTORAGE FUNCTIES
+        // ============================================
+        function saveToLocalStorage() {
+            const data = {
+                vision: document.getElementById('visionInput').value,
+                threads: threads,
+                lastSaved: new Date().toISOString()
+            };
+            localStorage.setItem('slo-spinnenweb-data', JSON.stringify(data));
+            showAutoSaveIndicator();
+        }
+
+        function loadFromLocalStorage() {
+            const savedData = localStorage.getItem('slo-spinnenweb-data');
+            if (savedData) {
+                try {
+                    const data = JSON.parse(savedData);
+                    
+                    // Update vision
+                    if (data.vision) {
+                        document.getElementById('visionInput').value = data.vision;
+                        visionText = data.vision;
+                    }
+                    
+                    // Update threads
+                    if (data.threads && Array.isArray(data.threads)) {
+                        data.threads.forEach(savedThread => {
+                            const thread = threads.find(t => t.id === savedThread.id);
+                            if (thread) {
+                                thread.score = savedThread.score;
+                                thread.notes = savedThread.notes;
+                            }
+                        });
+                    }
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Error loading from localStorage:', error);
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        function showAutoSaveIndicator() {
+            const indicator = document.getElementById('autoSaveIndicator');
+            indicator.classList.add('visible');
+            setTimeout(() => {
+                indicator.classList.remove('visible');
+            }, 2000);
+        }
+
+        function triggerAutoSave() {
+            // Debounce: wacht 1 seconde na laatste wijziging
+            clearTimeout(autoSaveTimeout);
+            autoSaveTimeout = setTimeout(() => {
+                saveToLocalStorage();
+            }, 1000);
+        }
+
+        function clearAllData() {
+            if (confirm('Weet je zeker dat je alle gegevens wilt wissen? Dit kan niet ongedaan worden gemaakt.')) {
+                localStorage.removeItem('slo-spinnenweb-data');
+                location.reload();
+            }
+        }
+
+        // ============================================
+        // FUNCTIE: Genereer invoervelden
+        // ============================================
+        function generateThreadInputs() {
+            const container = document.getElementById('threadsContainer');
+            
+            threads.forEach((thread, index) => {
+                const threadDiv = document.createElement('div');
+                threadDiv.className = 'thread-item';
+                
+                threadDiv.innerHTML = `
+                    <div class="thread-header">
+                        <div>
+                            <div class="thread-title">${thread.title}</div>
+                            <div class="thread-question">${thread.question}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="score-label">Score (1 = zwak, 5 = sterk):</div>
+                    <div class="score-control" role="radiogroup" aria-labelledby="score-label-${thread.id}">
+                        <span id="score-label-${thread.id}" class="sr-only">Score voor ${thread.title}</span>
+                        ${[1, 2, 3, 4, 5].map(score => `
+                            <button 
+                                type="button"
+                                class="score-button score-${score} ${thread.score === score ? 'active' : ''}" 
+                                onclick="setScore('${thread.id}', ${score}, event)"
+                                aria-pressed="${thread.score === score ? 'true' : 'false'}"
+                                aria-label="Score ${score} voor ${thread.title}"
+                            >
+                                ${score}
+                            </button>
+                        `).join('')}
+                    </div>
+                    
+                    <textarea 
+                        class="thread-notes" 
+                        placeholder="Toelichting: waarom deze score? Wat zijn sterke punten of verbeterpunten?"
+                        onchange="updateNotes('${thread.id}', this.value)"
+                        aria-label="Notities voor ${thread.title}"
+                        id="notes-${thread.id}"
+                    >${thread.notes}</textarea>
+                `;
+                
+                container.appendChild(threadDiv);
+            });
+        }
+
+        // ============================================
+        // FUNCTIE: Update reflectieve samenvatting
+        // ============================================
+        function updateReflectiveSummary() {
+            const summaryContainer = document.getElementById('reflectiveSummary');
+            const itemsContainer = document.getElementById('reflectiveItems');
+            
+            // Filter items met score ≤ 3
+            const attentionItems = threads.filter(thread => thread.score <= 3);
+            
+            if (attentionItems.length === 0) {
+                summaryContainer.style.display = 'none';
+                return;
+            }
+            
+            // Toon samenvatting
+            summaryContainer.style.display = 'block';
+            
+            // Genereer HTML voor items
+            itemsContainer.innerHTML = attentionItems.map(thread => {
+                const notesPreview = thread.notes 
+                    ? thread.notes.length > 120 
+                        ? thread.notes.substring(0, 120) + '...' 
+                        : thread.notes
+                    : 'Geen toelichting';
+                
+                return `
+                    <div class="reflective-item" onclick="scrollToThread('${thread.id}')" role="listitem" tabindex="0" onkeydown="handleReflectiveKeydown(event, '${thread.id}')">
+                        <div class="reflective-item-title">${thread.title}</div>
+                        <div class="reflective-item-notes">${notesPreview}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ============================================
+        // FUNCTIE: Scroll naar thread
+        // ============================================
+        function scrollToThread(threadId) {
+            const threadElement = document.getElementById(`notes-${threadId}`);
+            if (threadElement) {
+                threadElement.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center' 
+                });
+                threadElement.focus();
+            }
+        }
+
+        // ============================================
+        // FUNCTIE: Handle keyboard voor reflectieve items
+        // ============================================
+        function handleReflectiveKeydown(event, threadId) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                scrollToThread(threadId);
+            }
+        }
+
+        // ============================================
+        // FUNCTIE: Update score
+        // ============================================
+        function setScore(threadId, score, event) {
+            const thread = threads.find(t => t.id === threadId);
+            if (thread) {
+                thread.score = score;
+                
+                // Update button styling
+                const buttons = document.querySelectorAll(`button[onclick*="${threadId}"]`);
+                buttons.forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                event.target.classList.add('active');
+                
+                // Redraw spider web
+                drawSpiderWeb();
+                
+                // Update reflective summary
+                updateReflectiveSummary();
+                
+                // Auto-save
+                triggerAutoSave();
+            }
+        }
+
+        // ============================================
+        // FUNCTIE: Update notities
+        // ============================================
+        function updateNotes(threadId, notes) {
+            const thread = threads.find(t => t.id === threadId);
+            if (thread) {
+                thread.notes = notes;
+                updateReflectiveSummary();
+                triggerAutoSave();
+            }
+        }
+
+        // ============================================
+        // FUNCTIE: Kleur bepalen op basis van score
+        // ============================================
+        function getColorForScore(score) {
+            if (score >= 4) return '#2d8659'; // Groen
+            if (score === 3) return '#d68430'; // Oranje
+            return '#c94545'; // Rood
+        }
+
+        // ============================================
+        // FUNCTIE: Teken het spinnenweb (SVG)
+        // ============================================
+        function drawSpiderWeb() {
+            const svg = document.getElementById('spiderWebSVG');
+            const centerX = 300;
+            const centerY = 300;
+            const maxRadius = 220;
+            const levels = 5;
+            
+            // Clear SVG
+            svg.innerHTML = '';
+            
+            // Achtergrond cirkel
+            const bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            bgCircle.setAttribute('cx', centerX);
+            bgCircle.setAttribute('cy', centerY);
+            bgCircle.setAttribute('r', maxRadius + 20);
+            bgCircle.setAttribute('fill', '#f8f6f3');
+            svg.appendChild(bgCircle);
+            
+            // Teken concentrische cirkels (niveaus)
+            for (let i = 1; i <= levels; i++) {
+                const radius = (maxRadius / levels) * i;
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', centerX);
+                circle.setAttribute('cy', centerY);
+                circle.setAttribute('r', radius);
+                circle.setAttribute('fill', 'none');
+                circle.setAttribute('stroke', '#e0ddd8');
+                circle.setAttribute('stroke-width', i === levels ? '2' : '1');
+                circle.setAttribute('stroke-dasharray', i === levels ? 'none' : '5,5');
+                svg.appendChild(circle);
+                
+                // Label voor niveau
+                const levelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                levelText.setAttribute('x', centerX + radius - 15);
+                levelText.setAttribute('y', centerY - 5);
+                levelText.setAttribute('font-size', '11');
+                levelText.setAttribute('fill', '#999');
+                levelText.textContent = i;
+                svg.appendChild(levelText);
+            }
+            
+            // Bereken posities voor de 9 draden
+            const angleStep = (2 * Math.PI) / threads.length;
+            const startAngle = -Math.PI / 2; // Start bovenaan
+            
+            // Teken lijnen van centrum naar buitenste cirkel
+            threads.forEach((thread, index) => {
+                const angle = startAngle + (angleStep * index);
+                const endX = centerX + Math.cos(angle) * maxRadius;
+                const endY = centerY + Math.sin(angle) * maxRadius;
+                
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', centerX);
+                line.setAttribute('y1', centerY);
+                line.setAttribute('x2', endX);
+                line.setAttribute('y2', endY);
+                line.setAttribute('stroke', '#d0ccc5');
+                line.setAttribute('stroke-width', '1');
+                svg.appendChild(line);
+            });
+            
+            // Teken de data polygon (verbind de scores)
+            const dataPoints = threads.map((thread, index) => {
+                const angle = startAngle + (angleStep * index);
+                const radius = (maxRadius / levels) * thread.score;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+                return `${x},${y}`;
+            });
+            
+            const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            polygon.setAttribute('points', dataPoints.join(' '));
+            polygon.setAttribute('fill', 'rgba(201, 169, 97, 0.2)');
+            polygon.setAttribute('stroke', 'rgba(201, 169, 97, 0.8)');
+            polygon.setAttribute('stroke-width', '3');
+            polygon.setAttribute('stroke-linejoin', 'round');
+            svg.appendChild(polygon);
+            
+            // Teken punten en labels voor elke draad
+            threads.forEach((thread, index) => {
+                const angle = startAngle + (angleStep * index);
+                const scoreRadius = (maxRadius / levels) * thread.score;
+                const pointX = centerX + Math.cos(angle) * scoreRadius;
+                const pointY = centerY + Math.sin(angle) * scoreRadius;
+                
+                // Score punt
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', pointX);
+                circle.setAttribute('cy', pointY);
+                circle.setAttribute('r', '8');
+                circle.setAttribute('fill', getColorForScore(thread.score));
+                circle.setAttribute('stroke', 'white');
+                circle.setAttribute('stroke-width', '2');
+                circle.setAttribute('class', 'data-point');
+                circle.setAttribute('data-thread', thread.id);
+                
+                // Tooltip event
+                circle.addEventListener('mouseenter', (e) => showTooltip(e, thread));
+                circle.addEventListener('mouseleave', hideTooltip);
+                
+                svg.appendChild(circle);
+                
+                // Label positie (buiten de cirkel)
+                const labelDistance = maxRadius + 40;
+                const labelX = centerX + Math.cos(angle) * labelDistance;
+                const labelY = centerY + Math.sin(angle) * labelDistance;
+                
+                // Label tekst
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', labelX);
+                text.setAttribute('y', labelY);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('font-size', '13');
+                text.setAttribute('font-weight', '600');
+                text.setAttribute('fill', '#2d2d2d');
+                text.setAttribute('font-family', 'Crimson Pro, serif');
+                
+                // Multi-line tekst voor lange labels
+                const words = thread.title.split(' ');
+                if (words.length > 2) {
+                    const tspan1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                    tspan1.setAttribute('x', labelX);
+                    tspan1.setAttribute('dy', '-0.6em');
+                    tspan1.textContent = words.slice(0, Math.ceil(words.length / 2)).join(' ');
+                    text.appendChild(tspan1);
+                    
+                    const tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                    tspan2.setAttribute('x', labelX);
+                    tspan2.setAttribute('dy', '1.2em');
+                    tspan2.textContent = words.slice(Math.ceil(words.length / 2)).join(' ');
+                    text.appendChild(tspan2);
+                } else {
+                    text.textContent = thread.title;
+                }
+                
+                svg.appendChild(text);
+            });
+            
+            // Centrum cirkel voor Visie
+            const visionCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            visionCircle.setAttribute('cx', centerX);
+            visionCircle.setAttribute('cy', centerY);
+            visionCircle.setAttribute('r', '45');
+            visionCircle.setAttribute('fill', '#1e4d7b');
+            visionCircle.setAttribute('stroke', '#c9a961');
+            visionCircle.setAttribute('stroke-width', '3');
+            svg.appendChild(visionCircle);
+            
+            // Visie tekst
+            const visionLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            visionLabel.setAttribute('x', centerX);
+            visionLabel.setAttribute('y', centerY);
+            visionLabel.setAttribute('text-anchor', 'middle');
+            visionLabel.setAttribute('dominant-baseline', 'middle');
+            visionLabel.setAttribute('font-size', '16');
+            visionLabel.setAttribute('font-weight', 'bold');
+            visionLabel.setAttribute('fill', 'white');
+            visionLabel.setAttribute('font-family', 'Crimson Pro, serif');
+            visionLabel.textContent = 'VISIE';
+            svg.appendChild(visionLabel);
+        }
+
+        // ============================================
+        // FUNCTIE: Tooltip tonen
+        // ============================================
+        function showTooltip(event, thread) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.innerHTML = `
+                <strong>${thread.title}</strong><br>
+                Score: ${thread.score}/5<br>
+                ${thread.notes ? `<em>${thread.notes.substring(0, 100)}${thread.notes.length > 100 ? '...' : ''}</em>` : '<em>Geen toelichting</em>'}
+            `;
+            tooltip.classList.add('visible');
+            
+            // Position tooltip to prevent viewport overflow
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            let left = event.pageX + 15;
+            let top = event.pageY + 15;
+            
+            // Adjust horizontal position if tooltip would overflow right edge
+            if (left + tooltipRect.width > viewportWidth) {
+                left = event.pageX - tooltipRect.width - 15;
+            }
+            
+            // Adjust vertical position if tooltip would overflow bottom edge
+            if (top + tooltipRect.height > viewportHeight) {
+                top = event.pageY - tooltipRect.height - 15;
+            }
+            
+            // Ensure tooltip doesn't go beyond left/top edges
+            left = Math.max(5, left);
+            top = Math.max(5, top);
+            
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        }
+
+        function hideTooltip() {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.classList.remove('visible');
+        }
+
+        // ============================================
+        // FUNCTIE: Export als PNG
+        // ============================================
+        function exportAsPNG() {
+            const svg = document.getElementById('spiderWebSVG');
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const img = new Image();
+            const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(svgBlob);
+            
+            img.onload = function() {
+                // Calculate canvas height based on whether reflective summary exists
+                const attentionItems = threads.filter(thread => thread.score <= 3);
+                const hasReflectiveItems = attentionItems.length > 0;
+                const baseHeight = 1200;
+                const summaryHeight = hasReflectiveItems ? Math.min(300, attentionItems.length * 50 + 80) : 0;
+                canvas.width = 1200;
+                canvas.height = baseHeight + summaryHeight;
+                
+                // Witte achtergrond
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw spider web
+                ctx.drawImage(img, 0, 0, 1200, 1200);
+                URL.revokeObjectURL(url);
+                
+                // Add reflective summary if items exist
+                if (hasReflectiveItems) {
+                    // Background container (matching webpage styling)
+                    ctx.fillStyle = '#fafaf9';
+                    ctx.fillRect(30, 1220, 1140, Math.min(200, attentionItems.length * 50 + 60));
+                    
+                    // Border
+                    ctx.strokeStyle = '#e0ddd8';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(30, 1220, 1140, Math.min(200, attentionItems.length * 50 + 60));
+                    
+                    // Title
+                    ctx.fillStyle = '#2d2d2d';
+                    ctx.font = 'bold 18px Work Sans, sans-serif';
+                    ctx.fillText('Componenten die aandacht vragen', 50, 1245);
+                    
+                    // Items with styling matching webpage
+                    let yOffset = 1265;
+                    
+                    attentionItems.forEach((thread, index) => {
+                        if (yOffset > 1380) return; // Prevent overflow
+                        
+                        // Item background (white)
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(50, yOffset - 15, 1100, 35);
+                        
+                        // Left border (medium score color)
+                        ctx.fillStyle = '#d68430';
+                        ctx.fillRect(50, yOffset - 15, 2, 35);
+                        
+                        // Component title
+                        ctx.fillStyle = '#2d2d2d';
+                        ctx.font = 'bold 16px Work Sans, sans-serif';
+                        ctx.fillText(thread.title, 65, yOffset);
+                        
+                        // Notes preview
+                        if (thread.notes) {
+                            ctx.fillStyle = '#666666';
+                            ctx.font = '14px Work Sans, sans-serif';
+                            const notesText = thread.notes.length > 100 
+                                ? thread.notes.substring(0, 100) + '...' 
+                                : thread.notes;
+                            
+                            // Handle multi-line text with proper wrapping
+                            const words = notesText.split(' ');
+                            let line = '';
+                            let lineY = yOffset + 18;
+                            
+                            for (let n = 0; n < words.length; n++) {
+                                const testLine = line + words[n] + ' ';
+                                const metrics = ctx.measureText(testLine);
+                                const testWidth = metrics.width;
+                                
+                                if (testWidth > 1000 && n > 0) {
+                                    ctx.fillText(line, 65, lineY);
+                                    line = words[n] + ' ';
+                                    lineY += 16;
+                                    if (lineY > yOffset + 30) break; // Max 2 lines
+                                } else {
+                                    line = testLine;
+                                }
+                            }
+                            ctx.fillText(line, 65, lineY);
+                            yOffset += 50;
+                        } else {
+                            yOffset += 40;
+                        }
+                    });
+                }
+                
+                // Download
+                canvas.toBlob(function(blob) {
+                    const downloadUrl = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.download = 'slo-spinnenweb.png';
+                    link.href = downloadUrl;
+                    link.click();
+                    URL.revokeObjectURL(downloadUrl);
+                });
+            };
+            
+            img.src = url;
+        }
+
+        // ============================================
+        // FUNCTIE: Export als PDF
+        // ============================================
+        async function exportAsPDF() {
+            // Check if jsPDF is loaded
+            if (typeof window.jspdf === 'undefined') {
+                alert('PDF export is niet beschikbaar. Controleer je internetverbinding en probeer het opnieuw.');
+                return;
+            }
+            
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const margin = 15;
+            let yPosition = margin;
+            
+            // Titel
+            pdf.setFontSize(20);
+            pdf.setTextColor(30, 77, 123); // Vision color
+            pdf.text('SLO Spinnenweb van Van den Akker', pageWidth / 2, yPosition, { align: 'center' });
+            yPosition += 10;
+            
+            // Datum
+            pdf.setFontSize(10);
+            pdf.setTextColor(102, 102, 102);
+            pdf.text(`Gegenereerd op: ${new Date().toLocaleDateString('nl-NL')}`, pageWidth / 2, yPosition, { align: 'center' });
+            yPosition += 15;
+            
+            // Visie sectie
+            pdf.setFontSize(14);
+            pdf.setTextColor(30, 77, 123);
+            pdf.text('Visie (Waartoe leren zij?)', margin, yPosition);
+            yPosition += 7;
+            
+            pdf.setFontSize(10);
+            pdf.setTextColor(45, 45, 45);
+            const visionText = document.getElementById('visionInput').value || 'Geen visie ingevuld';
+            const visionLines = pdf.splitTextToSize(visionText, pageWidth - 2 * margin);
+            pdf.text(visionLines, margin, yPosition);
+            yPosition += visionLines.length * 5 + 10;
+            
+            // Spinnenweb visualisatie
+            try {
+                const svg = document.getElementById('spiderWebSVG');
+                const svgData = new XMLSerializer().serializeToString(svg);
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = 1200;
+                canvas.height = 1200;
+                
+                const img = new Image();
+                const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(svgBlob);
+                
+                await new Promise((resolve, reject) => {
+                    img.onload = () => {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0, 1200, 1200);
+                        URL.revokeObjectURL(url);
+                        resolve();
+                    };
+                    img.onerror = reject;
+                    img.src = url;
+                });
+                
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = pageWidth - 2 * margin;
+                const imgHeight = imgWidth; // Square
+                
+                // Check if we need a new page
+                if (yPosition + imgHeight > pageHeight - margin) {
+                    pdf.addPage();
+                    yPosition = margin;
+                }
+                
+                pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
+                yPosition += imgHeight + 10;
+                
+            } catch (error) {
+                console.error('Error adding spider web to PDF:', error);
+            }
+            
+            // Nieuwe pagina voor componenten
+            pdf.addPage();
+            yPosition = margin;
+            
+            // Componenten details
+            pdf.setFontSize(14);
+            pdf.setTextColor(30, 77, 123);
+            pdf.text('Curriculumcomponenten - Detailoverzicht', margin, yPosition);
+            yPosition += 10;
+            
+            threads.forEach((thread, index) => {
+                // Check if we need a new page
+                if (yPosition > pageHeight - 40) {
+                    pdf.addPage();
+                    yPosition = margin;
+                }
+                
+                // Thread titel
+                pdf.setFontSize(12);
+                pdf.setTextColor(45, 45, 45);
+                pdf.text(`${index + 1}. ${thread.title}`, margin, yPosition);
+                yPosition += 6;
+                
+                // Vraag
+                pdf.setFontSize(9);
+                pdf.setTextColor(102, 102, 102);
+                pdf.setFont(undefined, 'italic');
+                pdf.text(thread.question, margin + 5, yPosition);
+                yPosition += 5;
+                pdf.setFont(undefined, 'normal');
+                
+                // Score met kleur
+                const scoreColor = thread.score >= 4 ? [45, 134, 89] : (thread.score === 3 ? [214, 132, 48] : [201, 69, 69]);
+                pdf.setTextColor(...scoreColor);
+                pdf.text(`Score: ${thread.score}/5`, margin + 5, yPosition);
+                yPosition += 6;
+                
+                // Notities
+                if (thread.notes) {
+                    pdf.setFontSize(9);
+                    pdf.setTextColor(45, 45, 45);
+                    const notesLines = pdf.splitTextToSize(thread.notes, pageWidth - 2 * margin - 10);
+                    pdf.text(notesLines, margin + 5, yPosition);
+                    yPosition += notesLines.length * 4 + 3;
+                } else {
+                    pdf.setFontSize(9);
+                    pdf.setTextColor(150, 150, 150);
+                    pdf.text('Geen toelichting', margin + 5, yPosition);
+                    yPosition += 5;
+                }
+                
+                yPosition += 5; // Extra ruimte tussen items
+            });
+            
+            // Save PDF
+            pdf.save('slo-spinnenweb-rapport.pdf');
+        }
+
+        // ============================================
+        // FUNCTIE: Export als JSON
+        // ============================================
+        function exportAsJSON() {
+            const data = {
+                vision: document.getElementById('visionInput').value,
+                threads: threads,
+                exportDate: new Date().toISOString()
+            };
+            
+            const jsonString = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.download = 'slo-spinnenweb-data.json';
+            link.href = url;
+            link.click();
+            
+            URL.revokeObjectURL(url);
+        }
+
+        // ============================================
+        // FUNCTIE: Laden vanuit JSON
+        // ============================================
+        function loadFromJSON() {
+            document.getElementById('jsonFileInput').click();
+        }
+
+        document.getElementById('jsonFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    // Update vision
+                    if (data.vision) {
+                        document.getElementById('visionInput').value = data.vision;
+                        visionText = data.vision;
+                    }
+                    
+                    // Update threads
+                    if (data.threads && Array.isArray(data.threads)) {
+                        data.threads.forEach(loadedThread => {
+                            const thread = threads.find(t => t.id === loadedThread.id);
+                            if (thread) {
+                                thread.score = loadedThread.score;
+                                thread.notes = loadedThread.notes;
+                            }
+                        });
+                    }
+                    
+                    // Regenerate UI
+                    document.getElementById('threadsContainer').innerHTML = '';
+                    generateThreadInputs();
+                    drawSpiderWeb();
+                    updateReflectiveSummary();
+                    
+                    alert('Data succesvol geladen!');
+                } catch (error) {
+                    alert('Fout bij het laden van het JSON-bestand: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+            
+            // Reset file input
+            e.target.value = '';
+        });
+
+        // ============================================
+        // FUNCTIE: Update vision text
+        // ============================================
+        document.getElementById('visionInput').addEventListener('input', function(e) {
+            visionText = e.target.value;
+            triggerAutoSave();
+        });
+
+        // ============================================
+        // INITIALISATIE
+        // ============================================
+        window.addEventListener('DOMContentLoaded', function() {
+            // Probeer eerst data te laden uit localStorage
+            const hasLocalData = loadFromLocalStorage();
+            
+            // Genereer UI
+            generateThreadInputs();
+            drawSpiderWeb();
+            updateReflectiveSummary();
+            
+            // Toon notificatie als er data geladen is
+            if (hasLocalData) {
+                const indicator = document.getElementById('autoSaveIndicator');
+                indicator.textContent = 'Eerdere sessie hersteld';
+                indicator.classList.add('visible');
+                setTimeout(() => {
+                    indicator.classList.remove('visible');
+                    indicator.textContent = 'Automatisch opgeslagen';
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>
