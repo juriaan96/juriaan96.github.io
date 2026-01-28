@@ -1250,7 +1250,7 @@
                 canvas.toBlob(function(blob) {
                     const downloadUrl = URL.createObjectURL(blob);
                     const link = document.createElement('a');
-                    link.download = 'slo-spinnenweb.png';
+                    link.download = 'spinnenweb.png';
                     link.href = downloadUrl;
                     link.click();
                     URL.revokeObjectURL(downloadUrl);
@@ -1406,7 +1406,7 @@
             });
             
             // Save PDF
-            pdf.save('slo-spinnenweb-rapport.pdf');
+            pdf.save('spinnenweb-rapport.pdf');
         }
 
         // ============================================
