@@ -544,6 +544,32 @@
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
+
+        /* Visie Sectie */
+        .vision-section-summary {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: #fafaf9;
+            border-radius: 2px;
+            border: 1px solid var(--color-border);
+        }
+
+        .vision-title {
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+            color: var(--color-text-primary);
+        }
+
+        .vision-content {
+            font-size: 0.8125rem;
+            color: var(--color-text-primary);
+            line-height: 1.5;
+            white-space: normal;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
+            font-family: 'Work Sans', sans-serif;
+        }
     </style>
 </head>
 <body>
@@ -607,8 +633,18 @@
                     <div id="reflectiveItems" class="reflective-items" role="list"></div>
                 </div>
 
+                <!-- Visie Sectie -->
+                <div id="visionSection" class="vision-section-summary" style="display: none;" aria-labelledby="vision-summary-heading">
+                    <h3 id="vision-summary-heading" class="vision-title">Visie (centrum van het spinnenweb)</h3>
+                    <div id="visionItems" class="reflective-items">
+                        <div class="reflective-item">
+                            <div id="visionContent" class="vision-content"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Export Knoppen -->
-                <div class="export-buttons" role="group" aria-label="Export en beheer opties">
+                <div class="export-buttons no-export" role="group" aria-label="Export en beheer opties">
                     <button class="btn btn-primary" onclick="exportAsPNG()" aria-label="Exporteer visualisatie als PNG afbeelding">Export PNG</button>
                     <button class="btn btn-primary" onclick="exportAsPDF()" aria-label="Exporteer rapport als PDF document">Export PDF</button>
                     <button class="btn btn-secondary" onclick="window.print()" aria-label="Print pagina">Printen</button>
@@ -818,6 +854,22 @@
         }
 
         // ============================================
+        // FUNCTIE: Update visie sectie
+        // ============================================
+        function updateVisionSection() {
+            const visionSection = document.getElementById('visionSection');
+            const visionContent = document.getElementById('visionContent');
+            const visionText = document.getElementById('visionInput').value;
+            
+            if (visionText && visionText.trim().length > 0) {
+                visionSection.style.display = 'block';
+                visionContent.textContent = visionText.trim();
+            } else {
+                visionSection.style.display = 'none';
+            }
+        }
+
+        // ============================================
         // FUNCTIE: Update reflectieve samenvatting
         // ============================================
         function updateReflectiveSummary() {
@@ -921,6 +973,41 @@
             if (score >= 4) return '#2d8659'; // Groen
             if (score === 3) return '#d68430'; // Oranje
             return '#c94545'; // Rood
+        }
+
+        // ============================================
+        // FUNCTIE: Helper voor tekst wrapping in SVG
+        // ============================================
+        function wrapVisionText(text, maxCharsPerLine) {
+            if (!text || text.trim().length === 0) return [];
+            
+            const words = text.trim().split(' ');
+            const lines = [];
+            let currentLine = '';
+            
+            for (let i = 0; i < words.length; i++) {
+                const testLine = currentLine + (currentLine ? ' ' : '') + words[i];
+                
+                if (testLine.length <= maxCharsPerLine) {
+                    currentLine = testLine;
+                } else {
+                    if (currentLine) {
+                        lines.push(currentLine);
+                        currentLine = words[i];
+                    } else {
+                        // Word is too long, break it
+                        lines.push(words[i].substring(0, maxCharsPerLine));
+                        currentLine = words[i].substring(maxCharsPerLine);
+                    }
+                }
+            }
+            
+            if (currentLine) {
+                lines.push(currentLine);
+            }
+            
+            // Limit to maximum 3 lines to fit in circle
+            return lines.slice(0, 3);
         }
 
         // ============================================
@@ -1135,103 +1222,30 @@
         // FUNCTIE: Export als PNG
         // ============================================
         function exportAsPNG() {
-            const svg = document.getElementById('spiderWebSVG');
-            const svgData = new XMLSerializer().serializeToString(svg);
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
+            // Hide elements with no-export class temporarily
+            const noExportElements = document.querySelectorAll('.no-export');
+            const originalDisplays = [];
             
-            const img = new Image();
-            const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-            const url = URL.createObjectURL(svgBlob);
+            noExportElements.forEach(element => {
+                originalDisplays.push(element.style.display);
+                element.style.display = 'none';
+            });
             
-            img.onload = function() {
-                // Calculate canvas height based on whether reflective summary exists
-                const attentionItems = threads.filter(thread => thread.score <= 3);
-                const hasReflectiveItems = attentionItems.length > 0;
-                const baseHeight = 1200;
-                const summaryHeight = hasReflectiveItems ? Math.min(300, attentionItems.length * 50 + 80) : 0;
-                canvas.width = 1200;
-                canvas.height = baseHeight + summaryHeight;
+            // Capture the visualization section using html2canvas
+            const visualizationSection = document.querySelector('.visualization-section');
+            
+            html2canvas(visualizationSection, {
+                backgroundColor: '#ffffff',
+                scale: 2, // Higher resolution
+                useCORS: true,
+                allowTaint: true
+            }).then(canvas => {
+                // Restore visibility of no-export elements
+                noExportElements.forEach((element, index) => {
+                    element.style.display = originalDisplays[index];
+                });
                 
-                // Witte achtergrond
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Draw spider web
-                ctx.drawImage(img, 0, 0, 1200, 1200);
-                URL.revokeObjectURL(url);
-                
-                // Add reflective summary if items exist
-                if (hasReflectiveItems) {
-                    // Background container (matching webpage styling)
-                    ctx.fillStyle = '#fafaf9';
-                    ctx.fillRect(30, 1220, 1140, Math.min(200, attentionItems.length * 50 + 60));
-                    
-                    // Border
-                    ctx.strokeStyle = '#e0ddd8';
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(30, 1220, 1140, Math.min(200, attentionItems.length * 50 + 60));
-                    
-                    // Title
-                    ctx.fillStyle = '#2d2d2d';
-                    ctx.font = 'bold 18px Work Sans, sans-serif';
-                    ctx.fillText('Componenten die aandacht vragen', 50, 1245);
-                    
-                    // Items with styling matching webpage
-                    let yOffset = 1265;
-                    
-                    attentionItems.forEach((thread, index) => {
-                        if (yOffset > 1380) return; // Prevent overflow
-                        
-                        // Item background (white)
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(50, yOffset - 15, 1100, 35);
-                        
-                        // Left border (medium score color)
-                        ctx.fillStyle = '#d68430';
-                        ctx.fillRect(50, yOffset - 15, 2, 35);
-                        
-                        // Component title
-                        ctx.fillStyle = '#2d2d2d';
-                        ctx.font = 'bold 16px Work Sans, sans-serif';
-                        ctx.fillText(thread.title, 65, yOffset);
-                        
-                        // Notes preview
-                        if (thread.notes) {
-                            ctx.fillStyle = '#666666';
-                            ctx.font = '14px Work Sans, sans-serif';
-                            const notesText = thread.notes.length > 100 
-                                ? thread.notes.substring(0, 100) + '...' 
-                                : thread.notes;
-                            
-                            // Handle multi-line text with proper wrapping
-                            const words = notesText.split(' ');
-                            let line = '';
-                            let lineY = yOffset + 18;
-                            
-                            for (let n = 0; n < words.length; n++) {
-                                const testLine = line + words[n] + ' ';
-                                const metrics = ctx.measureText(testLine);
-                                const testWidth = metrics.width;
-                                
-                                if (testWidth > 1000 && n > 0) {
-                                    ctx.fillText(line, 65, lineY);
-                                    line = words[n] + ' ';
-                                    lineY += 16;
-                                    if (lineY > yOffset + 30) break; // Max 2 lines
-                                } else {
-                                    line = testLine;
-                                }
-                            }
-                            ctx.fillText(line, 65, lineY);
-                            yOffset += 50;
-                        } else {
-                            yOffset += 40;
-                        }
-                    });
-                }
-                
-                // Download
+                // Convert canvas to blob and download
                 canvas.toBlob(function(blob) {
                     const downloadUrl = URL.createObjectURL(blob);
                     const link = document.createElement('a');
@@ -1240,9 +1254,15 @@
                     link.click();
                     URL.revokeObjectURL(downloadUrl);
                 });
-            };
-            
-            img.src = url;
+            }).catch(error => {
+                // Restore visibility on error
+                noExportElements.forEach((element, index) => {
+                    element.style.display = originalDisplays[index];
+                });
+                
+                console.error('Error exporting PNG:', error);
+                alert('Er is een fout opgetreden bij het exporteren van de PNG. Probeer het opnieuw.');
+            });
         }
 
         // ============================================
@@ -1448,6 +1468,7 @@
                     generateThreadInputs();
                     drawSpiderWeb();
                     updateReflectiveSummary();
+                    updateVisionSection();
                     
                     alert('Data succesvol geladen!');
                 } catch (error) {
@@ -1465,6 +1486,7 @@
         // ============================================
         document.getElementById('visionInput').addEventListener('input', function(e) {
             visionText = e.target.value;
+            updateVisionSection();
             triggerAutoSave();
         });
 
@@ -1479,6 +1501,7 @@
             generateThreadInputs();
             drawSpiderWeb();
             updateReflectiveSummary();
+            updateVisionSection();
             
             // Toon notificatie als er data geladen is
             if (hasLocalData) {
