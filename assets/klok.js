@@ -150,7 +150,7 @@ function buildPage(T, auto, base) {
 <div class="stage" id="stage">
   <svg ${vb}><defs>${S.defsMarkup()}</defs>${back}</svg>
   <canvas id="fire" class="${T.camp ? 'open' : ''}" aria-hidden="true"></canvas>
-  <svg ${vb}>${front}</svg>
+  <svg ${vb}>${front}${(T.walkers || []).map((w, i) => `<g id="walker${i}" class="walker" style="display:none">${w.draw(P)}</g>`).join('')}</svg>
   <div class="glow" aria-hidden="true"></div><div class="night" aria-hidden="true"></div>
   ${hits}
   <p class="bubble" id="bubble" role="status" aria-live="polite"></p>
@@ -607,6 +607,52 @@ function run(T, auto, base) {
     flash(id, cls, ms) { const el = $(id); if (!el) return; el.classList.remove(cls); void el.getBoundingClientRect(); el.classList.add(cls); setTimeout(() => el.classList.remove(cls), ms || 2000); }
   };
   if (T.init) try { T.init(api); } catch (e) { report(e); }
+
+  /* figuren die af en toe voorbijkomen: één keer per uur op een willekeurig moment */
+  const walkers = (T.walkers || []).map((w, i) => ({ w, el: $('walker' + i) }));
+  const testWalk = /[?&]figuur/.test(location.search);
+  let walk = null;
+  function planWalk(ms, nextHour) {
+    if (testWalk) return ms + (nextHour ? 12000 : 2500);
+    const h0 = new Date(ms); h0.setMinutes(0, 0, 0);
+    const base = h0.getTime() + (nextHour ? 3600000 : 0);
+    let t = base + (3 + R() * 54) * 60000;
+    if (t <= ms + 5000) t = base + 3600000 + (3 + R() * 54) * 60000;
+    return t;
+  }
+  let nextWalk = planWalk(Date.now(), false);
+  function startWalk(now) {
+    const list = walkers.filter(o => o.el && (!o.w.when || o.w.when(now)));
+    if (!list.length) return;
+    const o = list[Math.floor(R() * list.length)];
+    walk = { o, dir: o.w.noFlip ? 1 : (R() < 0.5 ? 1 : -1), t0: performance.now(), dur: (o.w.dur || 15000) * (reduce ? 1.4 : 1), x: 500, y: o.w.y };
+    o.el.style.opacity = '';
+    o.el.style.display = '';
+  }
+  function stepWalk(t) {
+    if (!walk) return;
+    const w = walk.o.w, p = (t - walk.t0) / walk.dur;
+    if (p >= 1) { walk.o.el.style.display = 'none'; walk = null; return; }
+    const x0 = w.x0 != null ? w.x0 : -170, x1 = w.x1 != null ? w.x1 : 1170;
+    const x = walk.dir > 0 ? x0 + (x1 - x0) * p : x1 - (x1 - x0) * p, ph = (t - walk.t0) / 1000;
+    let y = w.y, r = 0;
+    if (w.hop) y -= Math.abs(Math.sin(ph * Math.PI * 1.6)) * w.hop;
+    if (w.bob) y -= Math.abs(Math.sin(ph * Math.PI * 2)) * w.bob;
+    if (w.waddle && !reduce) r = Math.sin(ph * Math.PI * 2) * w.waddle;
+    const sc = w.scale || 1;
+    walk.x = x; walk.y = y;
+    walk.o.el.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${r.toFixed(1)}) scale(${(sc * walk.dir).toFixed(3)} ${sc})`);
+    if (w.fade) walk.o.el.style.opacity = Math.min(1, Math.min(p, 1 - p) / 0.08).toFixed(2);
+  }
+  walkers.forEach(o => {
+    if (!o.el) return;
+    o.el.addEventListener('click', () => {
+      if (!walk || walk.o !== o) return;
+      const m = o.w.msgs;
+      say(m[Math.floor(R() * m.length)], Math.max(140, Math.min(860, walk.x)), walk.y - (o.w.h || 120), 3500);
+      chime('pop');
+    });
+  });
   document.querySelectorAll('.hit').forEach(b => {
     b.addEventListener('click', e => {
       const h = T.hits[+b.getAttribute('data-hit')];
@@ -642,6 +688,10 @@ function run(T, auto, base) {
     const now = new Date();
     try { updClock(now); } catch (e) { report(e); }
     try { fire(dt, t / 1000, now); window.__skFrames = (window.__skFrames || 0) + 1; } catch (e) { report(e); }
+    try {
+      if (!walk && walkers.length && Date.now() >= nextWalk) { startWalk(now); nextWalk = planWalk(Date.now(), true); }
+      stepWalk(t);
+    } catch (e) { report(e); }
   }
   try { updClock(new Date()); } catch (e) { report(e); }
   try { fire(0, performance.now() / 1000, new Date()); } catch (e) { report(e); }

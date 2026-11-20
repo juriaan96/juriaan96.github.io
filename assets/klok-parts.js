@@ -645,5 +645,99 @@ function campFront(S) {
     <g filter="${drop(S)}"><path d="M730 760c-6-30 10-60 40-70c30 10 40 40 34 70z" fill="#b8843f"/><circle cx="768" cy="726" r="11" fill="#2a1a0e"/><path d="M770 690L812 600" stroke="#5a3a22" stroke-width="7"/><path d="M806 600l14-12 8 8-14 12z" fill="#2a1a0e"/></g>`;
 }
 
-K.parts = { ctx, lin, rad, rng, f1, gold, silver, drop, halo, star, curve, wallPaper, wallLogs, wainscot, floor, vignette, bunting, garland, leafGarland, windowLeft, fireplaceBrick, fireplaceStone, dial, hands, clockMantel, clockCuckoo, clockMoon, candle, chocLetter, presents, staff, stocking, xmasTree, mug, pinecones, sled, logBasket, lantern, snowshoes, boots, tulips, birdhouse, blossomVase, eggBasket, chocBunny, pumpkin, umbrella, appleBowl, scatteredLeaves, pepernoten, klomp, hiddenEgg, campScene, campFront };
+
+/* ---------- figuren die af en toe voorbijkomen (getekend rond de voeten, kijkend naar rechts) ---------- */
+const fig = {
+  piet() {
+    return `<g class="lg1"><rect x="-13" y="-54" width="10" height="48" rx="4" fill="#5a2d82"/><ellipse cx="-5" cy="-5" rx="11" ry="5" fill="#2a1a10"/><rect x="-9" y="-9" width="6" height="4" fill="#d9a93f"/></g>
+      <ellipse cx="-30" cy="-98" rx="22" ry="27" fill="#8a5a2e"/><path d="M-38 -124q8-9 16 0" stroke="#5a3a1c" stroke-width="3" fill="none"/>
+      <path d="M-26 -80q26-11 52 0q4 24-6 30h-40q-10-6-6-30z" fill="#f3b23a"/><path d="M-12 -84v34M0 -86v36M12 -84v34" stroke="#7a3fb0" stroke-width="3"/>
+      <g class="lg2"><rect x="3" y="-54" width="10" height="48" rx="4" fill="#6a3a96"/><ellipse cx="11" cy="-5" rx="11" ry="5" fill="#2a1a10"/><rect x="7" y="-9" width="6" height="4" fill="#d9a93f"/></g>
+      <rect x="-20" y="-120" width="40" height="46" rx="10" fill="#7a3fb0"/>
+      <g fill="#f3d27a"><circle cx="2" cy="-108" r="2.6"/><circle cx="2" cy="-97" r="2.6"/><circle cx="2" cy="-86" r="2.6"/></g>
+      <path d="M10 -112q16 14 12 32" stroke="#7a3fb0" stroke-width="11" stroke-linecap="round" fill="none"/><circle cx="22" cy="-77" r="6" fill="#f1c9a5"/>
+      <ellipse cx="0" cy="-120" rx="25" ry="7" fill="#fff" stroke="#d8d0c4" stroke-width="2" stroke-dasharray="4 3"/>
+      <path d="M-18 -146c-4 10 0 18 6 20" fill="#4a2c1a"/>
+      <circle cx="2" cy="-142" r="19" fill="#f1c9a5"/>
+      <circle cx="11" cy="-146" r="2.4" fill="#2a1a10"/><circle cx="20" cy="-140" r="3" fill="#e6b08e"/><path d="M8 -133q6 5 12 0" stroke="#7a3a2a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M-8 -152q8-4 14 2" stroke="#3a3330" stroke-opacity=".55" stroke-width="4" stroke-linecap="round" fill="none"/><ellipse cx="3" cy="-134" rx="5" ry="2.4" fill="#3a3330" opacity=".4"/>
+      <ellipse cx="0" cy="-160" rx="25" ry="9" fill="#7a3fb0" transform="rotate(-10 0 -160)"/>
+      <path d="M-14 -164C-32 -188 -10 -204 8 -198C-6 -192 -14 -182 -14 -164Z" fill="#f6f0e0"/>`;
+  },
+  kat() {
+    return `<path d="M-34 -34C-56 -40 -60 -66 -46 -78" stroke="#e39b3a" stroke-width="9" fill="none" stroke-linecap="round"/>
+      <g class="lg2"><rect x="-22" y="-24" width="8" height="24" rx="4" fill="#c97e28"/><rect x="22" y="-24" width="8" height="24" rx="4" fill="#c97e28"/></g>
+      <ellipse cx="0" cy="-30" rx="38" ry="17" fill="#e39b3a"/>
+      <path d="M-18 -45q4 10 0 22M-6 -47q4 10 0 24M6 -47q4 10 0 24" stroke="#b86a1a" stroke-width="4" fill="none"/>
+      <g class="lg1"><rect x="-30" y="-24" width="8" height="24" rx="4" fill="#e39b3a"/><rect x="14" y="-24" width="8" height="24" rx="4" fill="#e39b3a"/></g>
+      <circle cx="40" cy="-46" r="16" fill="#e39b3a"/><path d="M44 -60l8 -12 4 14z" fill="#e39b3a"/>
+      <circle cx="48" cy="-48" r="2.6" fill="#1a1a1a"/><circle cx="55" cy="-42" r="2" fill="#e88a8a"/>
+      <path d="M52 -40h14M52 -38l13 4" stroke="#fff" stroke-width="1" opacity=".8"/>
+      <path d="M26 -58L40 -88L56 -60Z" fill="#c62828"/><rect x="24" y="-63" width="34" height="8" rx="4" fill="#fff"/><circle cx="39" cy="-90" r="5.5" fill="#fff"/>`;
+  },
+  pinguin() {
+    return `<ellipse cx="-8" cy="-3" rx="9" ry="4" fill="#f0a020"/><ellipse cx="10" cy="-3" rx="9" ry="4" fill="#f0a020"/>
+      <ellipse cx="0" cy="-42" rx="24" ry="40" fill="#1e2430"/><ellipse cx="6" cy="-36" rx="16" ry="30" fill="#f4f6fa"/>
+      <path d="M-16 -54q-14 18-6 32q8-14 10-30z" fill="#141a24"/>
+      <circle cx="10" cy="-66" r="4" fill="#fff"/><circle cx="12" cy="-66" r="2" fill="#111"/><path d="M18 -62l14 4-14 4z" fill="#f0a020"/>
+      <path d="M-20 -54q20 8 40 0v8q-20 8-40 0z" fill="#c62828"/><path d="M-16 -48l-14 20 8 2 12-18z" fill="#c62828"/>
+      <path d="M-20 -74q20-28 40 0z" fill="#3a78c8"/><circle cx="0" cy="-87" r="5" fill="#fff"/>`;
+  },
+  eekhoorn() {
+    return `<path d="M-14 -10C-40 -14 -44 -52 -24 -60C-12 -64 -6 -50 -14 -42C-22 -36 -20 -24 -10 -16Z" fill="#c4692c"/>
+      <g class="lg2"><ellipse cx="-6" cy="-3" rx="6" ry="4" fill="#9a4f1e"/></g>
+      <ellipse cx="2" cy="-14" rx="16" ry="12" fill="#b8642a"/><ellipse cx="8" cy="-10" rx="7" ry="6" fill="#f0d0a8"/>
+      <g class="lg1"><ellipse cx="10" cy="-3" rx="6" ry="4" fill="#b8642a"/></g>
+      <circle cx="18" cy="-26" r="9" fill="#b8642a"/><path d="M13 -33l2-9 6 7z" fill="#b8642a"/>
+      <circle cx="21" cy="-28" r="1.8" fill="#111"/><circle cx="27" cy="-25" r="1.6" fill="#3a2010"/>
+      <ellipse cx="30" cy="-19" rx="4" ry="5" fill="#8a5a2e"/><path d="M26 -23h8v-3h-8z" fill="#5a3a1c"/>`;
+  },
+  egel() {
+    let sp = '';
+    for (let i = 0; i < 13; i++) { const a = Math.PI * (0.98 - i * 0.065), x = -2 + Math.cos(a) * 30, y = -12 - Math.sin(a) * 28; sp += `<path d="M${f1(x)} ${f1(y)}l${f1(Math.cos(a) * 12)} ${f1(-Math.sin(a) * 12)}" />`; }
+    return `<g class="lg2"><ellipse cx="-12" cy="-3" rx="6" ry="4" fill="#4a3220"/></g>
+      <path d="M-32 -6C-34 -32 -10 -46 12 -40C24 -36 30 -24 30 -8Z" fill="#6b4a2e"/>
+      <g stroke="#3e2a18" stroke-width="3" stroke-linecap="round">${sp}</g>
+      <path d="M-8 -48C-2 -54 8 -52 10 -46C4 -42 -4 -42 -8 -48Z" fill="#d8722e"/>
+      <g class="lg1"><ellipse cx="14" cy="-3" rx="6" ry="4" fill="#4a3220"/></g>
+      <path d="M20 -26C34 -24 46 -16 50 -8L20 -4Z" fill="#d8b48a"/>
+      <circle cx="50" cy="-8" r="3.2" fill="#1a1a1a"/><circle cx="34" cy="-18" r="2.2" fill="#1a1a1a"/>`;
+  },
+  eendjes() {
+    const duck = (x, s, col) => `<g transform="translate(${x} 0) scale(${s})">
+      <g class="lg2"><path d="M6 -8v8h-7" stroke="#f0a020" stroke-width="3" fill="none"/></g>
+      <path d="M-18 -22l-12-6 4 12z" fill="${col}"/><ellipse cx="0" cy="-18" rx="20" ry="13" fill="${col}"/>
+      <path d="M-6 -20q8-8 16 2" stroke="#000" stroke-opacity=".15" fill="none" stroke-width="3"/>
+      <g class="lg1"><path d="M-4 -8v8h-7" stroke="#f0a020" stroke-width="3" fill="none"/></g>
+      <circle cx="14" cy="-36" r="10" fill="${col}"/><path d="M22 -38l12 3-12 4z" fill="#f0a020"/><circle cx="17" cy="-39" r="1.8" fill="#111"/></g>`;
+    return duck(-180, 0.75, '#ffd84a') + duck(-125, 0.75, '#ffd84a') + duck(-70, 0.75, '#ffd84a') + duck(0, 1.35, '#f7f4ec');
+  },
+  paashaas() {
+    return `<ellipse cx="-22" cy="-6" rx="16" ry="6" fill="#c4ad8c"/>
+      <ellipse cx="-4" cy="-26" rx="28" ry="20" fill="#d8c4a8"/><circle cx="-30" cy="-32" r="8" fill="#fff"/>
+      <ellipse cx="14" cy="-76" rx="5" ry="21" fill="#d8c4a8" transform="rotate(-18 14 -76)"/><ellipse cx="14" cy="-74" rx="2.5" ry="15" fill="#f4b6c6" transform="rotate(-18 14 -74)"/>
+      <ellipse cx="23" cy="-76" rx="5" ry="21" fill="#d8c4a8" transform="rotate(4 23 -76)"/><ellipse cx="23" cy="-74" rx="2.5" ry="15" fill="#f4b6c6" transform="rotate(4 23 -74)"/>
+      <circle cx="22" cy="-46" r="15" fill="#d8c4a8"/>
+      <circle cx="28" cy="-49" r="2.3" fill="#2a1a10"/><circle cx="36" cy="-43" r="2.2" fill="#e88a9a"/>
+      <ellipse cx="20" cy="-9" rx="6" ry="4" fill="#cbb594"/>
+      <path d="M-4 -44a14 12 0 0 1 28 0" fill="none" stroke="#a5743a" stroke-width="2.5"/>
+      <path d="M-6 -44h32l-4 14h-24z" fill="#b8843f"/>
+      <ellipse cx="3" cy="-46" rx="5" ry="6" fill="#f6a3c3"/><ellipse cx="13" cy="-47" rx="5" ry="6" fill="#8fd0f0"/><ellipse cx="21" cy="-45" rx="4" ry="5" fill="#ffd94a"/>`;
+  },
+  krab() {
+    let legs = '';
+    [-1, 1].forEach(sd => { [0, 1, 2].forEach(i => { legs += `<g class="${i % 2 ? 'lg1' : 'lg2'}"><path d="M${sd * (10 + i * 6)} -10l${sd * 10} 6l${sd * 2} 6" stroke="#b8341f" stroke-width="3" fill="none" stroke-linecap="round"/></g>`; }); });
+    return legs + `<ellipse cx="0" cy="-16" rx="24" ry="13" fill="#d8442a"/>
+      <path d="M-6 -26v-9M6 -26v-9" stroke="#d8442a" stroke-width="3"/><circle cx="-6" cy="-37" r="3.6" fill="#fff"/><circle cx="6" cy="-37" r="3.6" fill="#fff"/><circle cx="-5" cy="-37" r="1.7" fill="#111"/><circle cx="7" cy="-37" r="1.7" fill="#111"/>
+      <path d="M-22 -20q-16-12-12-26q8 6 3 11q9-2 9 7z" fill="#e8553a"/><path d="M22 -20q16-12 12-26q-8 6-3 11q-9-2-9 7z" fill="#e8553a"/>
+      <path d="M-8 -12q8 5 16 0" stroke="#8a2414" stroke-width="2" fill="none"/>`;
+  },
+  zeilboot() {
+    return `<path d="M-36 -10h72l-12 12h-48z" fill="#6b4426"/><path d="M0 -10V-74" stroke="#3a2414" stroke-width="3"/>
+      <path d="M2 -72L34 -14H2Z" fill="#f6f0e0"/><path d="M-2 -64L-26 -14H-2Z" fill="#e9dcc4"/><path d="M0 -74l12 4-12 4z" fill="#c8553d"/>
+      <path d="M-44 4q10-4 20 0t20 0t20 0t20 0" stroke="#bcd0ea" stroke-opacity=".5" stroke-width="2" fill="none"/>`;
+  }
+};
+
+K.parts = { ctx, lin, rad, rng, f1, gold, silver, drop, halo, star, curve, wallPaper, wallLogs, wainscot, floor, vignette, bunting, garland, leafGarland, windowLeft, fireplaceBrick, fireplaceStone, dial, hands, clockMantel, clockCuckoo, clockMoon, candle, chocLetter, presents, staff, stocking, xmasTree, mug, pinecones, sled, logBasket, lantern, snowshoes, boots, tulips, birdhouse, blossomVase, eggBasket, chocBunny, pumpkin, umbrella, appleBowl, scatteredLeaves, pepernoten, klomp, hiddenEgg, campScene, campFront, fig };
 })();

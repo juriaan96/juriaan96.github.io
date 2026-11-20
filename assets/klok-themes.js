@@ -14,7 +14,9 @@ function addTheme(T) { K.themes[T.slug] = T; K.order.push(T.slug); }
 
 /* ===================== HERFST ===================== */
 addTheme({
-  slug: 'herfst', name: 'Herfstklok', period: '1 september t/m 31 oktober',
+  slug: 'herfst',
+  walkers: [{ draw: P => P.fig.egel(), y: 886, scale: 1.5, dur: 20000, bob: 1.5, h: 80, msgs: ['Ik zoek een warm plekje voor mijn winterslaap.', 'Snuf snuf... ruik ik appels?', 'Even opwarmen bij de haard, dan ga ik weer.'] }],
+ name: 'Herfstklok', period: '1 september t/m 31 oktober',
   tagline: 'Regen tegen het raam, het vuur knappert.',
   hint: 'Klik op dingen in de kamer: er is van alles verstopt.',
   colors: { bg: '#1a0f08', bg2: '#3d2412', ink: '#f6ead6', muted: '#d8bf9a', accent: '#ffbf5a', accent2: '#e3892d', line: 'rgba(255,191,90,.3)', btnInk: '#2a1406', foot: '#a8865c', bubble: '#f8ecd8', bubbleInk: '#3a2210' },
@@ -70,7 +72,9 @@ const sintSeason = now => { const m = now.getMonth(), d = now.getDate(); return 
 let shoeFilled = false, lastGift = -1, biteN = 0, letterT = null, poemI = Math.floor(Math.random() * sintPoems.length);
 const bites = [[288, 350], [214, 412], [291, 392]], biteMsgs = ['Hap! Mmm, puur chocolade.', 'Nog eentje dan...', 'Oei, er is niet veel meer van over.'];
 addTheme({
-  slug: 'sinterklaas', name: 'Sinterklaasklok', period: '1 november t/m 5 december',
+  slug: 'sinterklaas',
+  walkers: [{ draw: P => P.fig.piet(), y: 888, scale: 0.85, dur: 15000, bob: 4, h: 170, when: sintSeason, msgs: ['Hoi! Ik kom even kijken of de klomp al klaar staat.', 'Psst, niet verder vertellen: Sint komt misschien vanavond!', 'Pepernootje? Ik heb er nog genoeg in mijn zak.', 'Even opwarmen bij de haard, dan weer het dak op!'] }],
+ name: 'Sinterklaasklok', period: '1 november t/m 5 december',
   tagline: 'Het vuur brandt, de klomp staat klaar.', coldTagline: 'Het vuur is uit, het feest is voorbij. Tot volgend jaar!',
   hint: 'Klik op de klomp of Sint al is geweest. En kijk goed rond: er is meer verstopt.',
   colors: { bg: '#1a0a0d', bg2: '#3d1117', ink: '#f6e7c8', muted: '#d4b994', accent: '#f3d27a', accent2: '#d9a93f', line: 'rgba(243,210,122,.3)', btnInk: '#2a1208', foot: '#a88c6c', bubble: '#f6e7c8', bubbleInk: '#3a170f' },
@@ -147,7 +151,9 @@ addTheme({
 /* ===================== KERST ===================== */
 const sockMsgs = ['In deze sok zit een mandarijn.', 'Een zuurstok! Precies wat ik wilde.', 'Leeg... nog wel.', 'Een paar warme wollen sokken in een sok. Handig!', 'Een briefje: nog even geduld.'];
 addTheme({
-  slug: 'kerst', name: 'Kerstklok', period: '6 t/m 26 december',
+  slug: 'kerst',
+  walkers: [{ draw: P => P.fig.kat(), y: 886, scale: 1.1, dur: 12000, bob: 2, h: 110, msgs: ['Miauw! Mag ik met de kerstballen spelen?', 'Prrr... lekker warm bij de haard.', 'Ik zoek de cadeautjes. Eentje is vast voor mij!'] }],
+ name: 'Kerstklok', period: '6 t/m 26 december',
   tagline: 'De boom staat, de lichtjes branden.',
   hint: 'Klik op dingen in de kamer: er is van alles verstopt.',
   colors: { bg: '#0b1a12', bg2: '#183a26', ink: '#f3eedf', muted: '#c9d6c2', accent: '#f3d27a', accent2: '#d9a93f', line: 'rgba(243,210,122,.3)', btnInk: '#1a1208', foot: '#9fb59a', bubble: '#f6f0e0', bubbleInk: '#1d2a20' },
@@ -198,7 +204,9 @@ addTheme({
 
 /* ===================== WINTER ===================== */
 addTheme({
-  slug: 'winter', name: 'Winterklok', period: '27 december t/m 31 januari',
+  slug: 'winter',
+  walkers: [{ draw: P => P.fig.pinguin(), y: 886, scale: 1.2, dur: 18000, waddle: 8, bob: 1, h: 120, msgs: ['Brrr! Ik kom even opwarmen bij de haard.', 'Waggel, waggel.', 'Heb jij mijn ijsschots gezien?'] }],
+ name: 'Winterklok', period: '27 december t/m 31 januari',
   tagline: 'Buiten sneeuw, binnen warme chocolademelk.',
   hint: 'Klik op dingen in de kamer: er is van alles verstopt.',
   colors: { bg: '#0b1220', bg2: '#1d2b44', ink: '#eef3fa', muted: '#b8c7dc', accent: '#cfe3ff', accent2: '#9cc3f0', line: 'rgba(207,227,255,.3)', btnInk: '#0b1a2e', foot: '#8ea3bf', bubble: '#eef5ff', bubbleInk: '#13233a' },
@@ -243,7 +251,9 @@ addTheme({
 
 /* ===================== BLOKHUT ===================== */
 addTheme({
-  slug: 'blokhut', name: 'Blokhutklok', period: 'februari',
+  slug: 'blokhut',
+  walkers: [{ draw: P => P.fig.eekhoorn(), y: 419, scale: 1.3, dur: 7000, x0: 170, x1: 830, hop: 10, fade: true, h: 80, msgs: ['Ik zoek mijn verstopte eikels!', 'Heb jij een nootje voor me?', 'Zoef! Ik ben er zo weer vandoor.'] }],
+ name: 'Blokhutklok', period: 'februari',
   tagline: 'Diep in het bos, warm bij de haard.',
   hint: 'Klik op dingen in de blokhut: er is van alles verstopt.',
   colors: { bg: '#140d08', bg2: '#3a2414', ink: '#f5ead8', muted: '#d2bc9c', accent: '#ffc56b', accent2: '#e39b3a', line: 'rgba(255,197,107,.3)', btnInk: '#2a1608', foot: '#a88a64', bubble: '#f6ecd8', bubbleInk: '#3a2210' },
@@ -288,7 +298,9 @@ function easterEvent(now, K, allowSummer) {
   return { main: 'Fijne Tweede Paasdag!', sub: 'Nog eieren over?' };
 }
 addTheme({
-  slug: 'voorjaar', name: 'Voorjaarsklok', period: 'maart t/m mei (behalve rond Pasen)',
+  slug: 'voorjaar',
+  walkers: [{ draw: P => P.fig.eendjes(), y: 887, scale: 1, dur: 16000, bob: 2, noFlip: true, x0: -60, x1: 1260, h: 80, msgs: ['Kwak! Op weg naar de sloot.', 'Piep piep piep!', 'Even tellen: een, twee, drie. Iedereen is er!'] }],
+ name: 'Voorjaarsklok', period: 'maart t/m mei (behalve rond Pasen)',
   tagline: 'De bloesem bloeit, de avonden zijn nog fris.',
   hint: 'Klik op dingen in de kamer: er is van alles verstopt.',
   colors: { bg: '#13201a', bg2: '#2e4a36', ink: '#f4f1e6', muted: '#cfdcc4', accent: '#ffd6e2', accent2: '#f6a3c3', line: 'rgba(255,214,226,.3)', btnInk: '#3a1424', foot: '#9fb59a', bubble: '#fdf6ea', bubbleInk: '#2c3a24' },
@@ -325,7 +337,9 @@ const EGGS = [[120, 862, '#f6a3c3', -20], [392, 866, '#ffd94a', 15], [612, 858, 
 const eggFound = {};
 let haasN = 0;
 addTheme({
-  slug: 'pasen', name: 'Paasklok', period: 'twee weken voor Pasen t/m Tweede Paasdag',
+  slug: 'pasen',
+  walkers: [{ draw: P => P.fig.paashaas(), y: 884, scale: 1.3, dur: 10000, hop: 38, h: 130, msgs: ['Ik heb nog een paar eieren te verstoppen!', 'Niet verder vertellen waar ik ze leg!', 'Hop, hop, hop, ik heb haast!'] }],
+ name: 'Paasklok', period: 'twee weken voor Pasen t/m Tweede Paasdag',
   tagline: 'De paashaas is geweest. Zoek jij de eieren?',
   hint: 'Er zijn zes paaseieren verstopt in de kamer. Vind jij ze allemaal?',
   colors: { bg: '#1c1426', bg2: '#3d2c52', ink: '#fbf5ea', muted: '#dcd0e6', accent: '#ffe27a', accent2: '#f6c84a', line: 'rgba(255,226,122,.3)', btnInk: '#2a1a08', foot: '#b3a3c4', bubble: '#fff8e8', bubbleInk: '#3a2a4a' },
@@ -373,7 +387,12 @@ addTheme({
 const mallowSteps = [['#fbf6ee', 'Nog een verse marshmallow. Even boven het vuur houden...'], ['#e8b56a', 'Goudbruin! Precies goed.'], ['#3a2a1c', 'Oeps, aangebrand!']];
 let mallowI = 0;
 addTheme({
-  slug: 'zomer', name: 'Zomerklok', period: 'juni t/m augustus',
+  slug: 'zomer',
+  walkers: [
+    { draw: P => P.fig.krab(), y: 862, scale: 1.3, dur: 15000, bob: 1, noFlip: true, h: 70, msgs: ['Zijwaarts is ook vooruit!', 'Knip knap! Ik zoek de zee.'] },
+    { draw: P => P.fig.zeilboot(), y: 506, scale: 0.9, dur: 45000, bob: 1.5, x0: -80, x1: 1080, h: 90, msgs: ['Ahoy! Een zeilbootje op weg naar de haven.'] }
+  ],
+ name: 'Zomerklok', period: 'juni t/m augustus',
   tagline: 'Zomeravond aan zee, bij het kampvuur.',
   hint: 'Klik rond bij het kampvuur: er is van alles te ontdekken.',
   colors: { bg: '#0a0f26', bg2: '#1f2552', ink: '#f4efe2', muted: '#c9c3dc', accent: '#ffd27a', accent2: '#f0a24a', line: 'rgba(255,210,122,.3)', btnInk: '#2a1608', foot: '#9a96b8', bubble: '#fff6e0', bubbleInk: '#2a2240' },

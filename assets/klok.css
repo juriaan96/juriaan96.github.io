@@ -119,6 +119,11 @@ html.fit .bubble{font-size:17px}
 @keyframes hop{30%{transform:translateY(-14px)}60%{transform:translateY(0)}80%{transform:translateY(-5px)}}
 .puff{transform-box:fill-box;transform-origin:50% 50%;animation:puff 1.8s ease-out forwards}
 @keyframes puff{from{opacity:.6;transform:translate(0,0) scale(1)}to{opacity:0;transform:translate(6px,-36px) scale(3.2)}}
+.walker{cursor:pointer}
+.lg1,.lg2{transform-box:fill-box;transform-origin:50% 0;animation:leg .45s ease-in-out infinite alternate}
+.lg2{animation-direction:alternate-reverse}
+@keyframes leg{from{transform:rotate(-18deg)}to{transform:rotate(18deg)}}
+@media(prefers-reduced-motion:reduce){.lg1,.lg2{animation:none}}
 @media(prefers-reduced-motion:reduce){.flame,.halo,.twk,.tw,.fall,.petal,.rainl,.leaf,.ff,.steam,.drip,.blink{animation:none}.bubble{transition:none}}
 
 /* overzichtspagina */
