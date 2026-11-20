@@ -146,6 +146,7 @@ function buildPage(T, auto, base) {
   const app = document.createElement('main');
   app.className = 'app'; app.id = 'app';
   app.innerHTML = `
+<a class="back" href="${base || './'}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Alle klokken</a>
 <header class="top"><h1>${T.name}</h1><p id="tagline">${T.tagline}</p></header>
 <div class="stage" id="stage">
   <svg ${vb}><defs>${S.defsMarkup()}</defs>${back}</svg>
@@ -171,7 +172,7 @@ function buildPage(T, auto, base) {
     </div>
   </section>
   <p class="hint">${T.hint}</p>
-  <footer><span id="eggs" class="eggs" hidden></span><a class="more" href="${base}klokken/">Alle haardklokken${auto ? ' (nu automatisch: ' + T.name + ')' : ''}</a></footer>
+  <footer><span id="eggs" class="eggs" hidden></span>${auto ? '<span class="autonote">Automatische klok: wisselt vanzelf mee met het seizoen.</span>' : ''}</footer>
 </div>`;
   document.body.insertBefore(app, document.body.firstChild);
   const rain = document.createElement('canvas');
@@ -663,7 +664,7 @@ function overview(base) {
   const el = document.createElement('main');
   el.className = 'overview';
   el.innerHTML = `<header><h1>Haardklokken</h1><p>Een klok bij het haardvuur voor elk seizoen. Elke klok telt af naar de eerstvolgende schoolvakantie.</p>
-    <p><a class="auto" href="${base}">Open de automatische klok</a> <span class="sub">die kiest zelf de klok die bij vandaag hoort, handig voor een smartboard.</span></p></header>
+    <p><a class="auto" href="${base}auto/">Open de automatische klok</a> <span class="sub">die kiest zelf de klok die bij vandaag hoort, handig voor een smartboard.</span></p></header>
     <div class="grid">${cards}</div>
     <footer>Vakantiedata: Rijksoverheid, regio Noord (basis- en voortgezet onderwijs). Herfst- en voorjaarsvakantie zijn adviesdata; je eigen school kan afwijken.</footer>`;
   document.body.insertBefore(el, document.body.firstChild);
