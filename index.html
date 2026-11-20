@@ -1,1520 +1,591 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactief Spinnenweb</title>
-    <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Work+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-    
-    <!-- jsPDF library voor PDF export -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    
-    <style>
-        /* ============================================
-           CSS VARIABELEN & BASIS STYLING
-           ============================================ */
-        :root {
-            --color-bg: #fafaf8;
-            --color-surface: #ffffff;
-            --color-text-primary: #2d2d2d;
-            --color-text-secondary: #666666;
-            --color-accent: #b89968;
-            --color-vision: #2c5278;
-            --color-score-high: #2d8659;
-            --color-score-medium: #d68430;
-            --color-score-low: #c94545;
-            --color-border: #e0ddd8;
-            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--color-bg);
-            color: var(--color-text-primary);
-            line-height: 1.6;
-            min-height: 100vh;
-            padding: 2rem 1rem;
-        }
-
-        /* ============================================
-           TYPOGRAFIE
-           ============================================ */
-        h1, h2, h3 {
-            font-family: 'Crimson Pro', Georgia, serif;
-            font-weight: 600;
-        }
-
-        h1 {
-            font-size: clamp(2rem, 5vw, 3rem);
-            color: var(--color-vision);
-            text-align: center;
-            margin-bottom: 0.5rem;
-            letter-spacing: -0.02em;
-        }
-
-        .subtitle {
-            text-align: center;
-            color: var(--color-text-secondary);
-            font-size: 1.1rem;
-            font-weight: 300;
-            margin-bottom: 3rem;
-            font-style: italic;
-        }
-
-        /* ============================================
-           CONTAINER & LAYOUT
-           ============================================ */
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        .main-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-
-        @media (max-width: 1024px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* ============================================
-           VISIE SECTIE (Centrum)
-           ============================================ */
-        .vision-section {
-            background: var(--color-vision);
-            padding: 1.75rem;
-            border-radius: 2px;
-            box-shadow: var(--shadow-sm);
-            margin-bottom: 2rem;
-            border-left: 3px solid var(--color-accent);
-        }
-
-        .vision-section h2 {
-            color: white;
-            font-size: 1.5rem;
-            margin-bottom: 0.75rem;
-        }
-
-        .vision-section .question {
-            color: rgba(255, 255, 255, 0.85);
-            font-size: 1rem;
-            margin-bottom: 1rem;
-            font-style: italic;
-        }
-
-        .vision-input {
-            width: 100%;
-            padding: 0.875rem;
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            border-radius: 2px;
-            font-family: 'Work Sans', sans-serif;
-            font-size: 1rem;
-            background: rgba(255, 255, 255, 0.97);
-            color: var(--color-text-primary);
-            transition: border-color 0.2s ease;
-            min-height: 100px;
-            resize: vertical;
-        }
-
-        .vision-input:focus {
-            outline: none;
-            border-color: var(--color-accent);
-            background: white;
-        }
-
-        /* ============================================
-           INVOER SECTIE
-           ============================================ */
-        .input-section {
-            background: var(--color-surface);
-            padding: 1.75rem;
-            border-radius: 2px;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .input-section h2 {
-            color: var(--color-vision);
-            font-size: 1.4rem;
-            margin-bottom: 1.25rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--color-border);
-        }
-
-        .thread-item {
-            margin-bottom: 1.5rem;
-            padding: 1.25rem;
-            background: #fafaf9;
-            border-radius: 2px;
-            border-left: 2px solid var(--color-accent);
-            transition: border-color 0.2s ease;
-        }
-
-        .thread-item:hover {
-            border-left-color: var(--color-vision);
-        }
-
-        .thread-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 1rem;
-        }
-
-        .thread-title {
-            font-family: 'Crimson Pro', serif;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--color-text-primary);
-        }
-
-        .thread-question {
-            font-size: 0.9rem;
-            color: var(--color-text-secondary);
-            font-style: italic;
-            margin-top: 0.25rem;
-        }
-
-        .score-control {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .score-label {
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: var(--color-text-secondary);
-            margin-bottom: 0.5rem;
-        }
-
-        .score-button {
-            flex: 1;
-            padding: 0.625rem;
-            border: 1px solid var(--color-border);
-            background: white;
-            border-radius: 2px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 1rem;
-            transition: border-color 0.2s ease, background-color 0.2s ease;
-            color: var(--color-text-secondary);
-        }
-
-        .score-button:hover {
-            border-color: var(--color-accent);
-        }
-
-        .score-button.active {
-            background: var(--color-accent);
-            color: white;
-            border-color: var(--color-accent);
-        }
-
-        .score-button.active.score-1,
-        .score-button.active.score-2 {
-            background: var(--color-score-low);
-            border-color: var(--color-score-low);
-        }
-
-        .score-button.active.score-3 {
-            background: var(--color-score-medium);
-            border-color: var(--color-score-medium);
-        }
-
-        .score-button.active.score-4,
-        .score-button.active.score-5 {
-            background: var(--color-score-high);
-            border-color: var(--color-score-high);
-        }
-
-        .thread-notes {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid var(--color-border);
-            border-radius: 2px;
-            font-family: 'Work Sans', sans-serif;
-            font-size: 0.95rem;
-            min-height: 80px;
-            resize: vertical;
-            transition: border-color 0.2s ease;
-        }
-
-        .thread-notes:focus {
-            outline: none;
-            border-color: var(--color-accent);
-        }
-
-        /* ============================================
-           VISUALISATIE SECTIE
-           ============================================ */
-        .visualization-section {
-            background: var(--color-surface);
-            padding: 1.75rem;
-            border-radius: 2px;
-            box-shadow: var(--shadow-sm);
-            position: sticky;
-            top: 2rem;
-            align-self: flex-start;
-        }
-
-        .visualization-section h2 {
-            color: var(--color-vision);
-            font-size: 1.4rem;
-            margin-bottom: 1rem;
-            text-align: center;
-        }
-        
-        @media (max-width: 1024px) {
-            .visualization-section {
-                position: relative;
-                top: 0;
-            }
-        }
-
-        #spiderWebContainer {
-            width: 100%;
-            height: 420px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-        }
-
-        #spiderWebSVG {
-            max-width: 100%;
-            max-height: 100%;
-        }
-
-        /* ============================================
-           EXPORT KNOPPEN
-           ============================================ */
-        .export-buttons {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            flex: 1;
-            min-width: 120px;
-            padding: 0.625rem 1rem;
-            border: 1px solid;
-            border-radius: 2px;
-            font-family: 'Work Sans', sans-serif;
-            font-size: 0.875rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background-color 0.2s ease, border-color 0.2s ease;
-            text-align: center;
-            background: white;
-        }
-
-        .btn-primary {
-            background: var(--color-vision);
-            color: white;
-            border-color: var(--color-vision);
-        }
-
-        .btn-primary:hover {
-            background: #234059;
-            border-color: #234059;
-        }
-
-        .btn-secondary {
-            background: white;
-            color: var(--color-vision);
-            border-color: var(--color-border);
-        }
-
-        .btn-secondary:hover {
-            border-color: var(--color-vision);
-        }
-
-        /* ============================================
-           LEGENDA
-           ============================================ */
-        .legend {
-            margin-top: 1rem;
-            padding: 0.75rem;
-            background: #fafaf9;
-            border-radius: 2px;
-            border: 1px solid var(--color-border);
-        }
-
-        .legend h3 {
-            font-size: 0.875rem;
-            margin-bottom: 0.5rem;
-            color: var(--color-text-primary);
-        }
-
-        .legend-items {
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            font-size: 0.8125rem;
-        }
-
-        .legend-color {
-            width: 14px;
-            height: 14px;
-            border-radius: 1px;
-            border: 1px solid rgba(0, 0, 0, 0.15);
-        }
-
-        /* ============================================
-           PRINT STYLING
-           ============================================ */
-        @media print {
-            body {
-                background: white;
-                padding: 0;
-            }
-            
-            .container {
-                max-width: 100%;
-            }
-            
-            .main-grid {
-                display: block;
-            }
-            
-            .visualization-section {
-                position: relative;
-                top: 0;
-                page-break-before: always;
-                box-shadow: none;
-                border: 1px solid #ccc;
-            }
-            
-            .input-section {
-                page-break-after: always;
-            }
-            
-            .export-buttons {
-                display: none;
-            }
-            
-            .thread-item {
-                page-break-inside: avoid;
-                box-shadow: none;
-                border: 1px solid #e0ddd8;
-            }
-            
-            .score-button:not(.active) {
-                background: #f5f5f5;
-            }
-            
-            .subtitle {
-                margin-bottom: 1rem;
-            }
-        }
-
-        /* ============================================
-           TOOLTIP STYLING
-           ============================================ */
-        .tooltip {
-            position: absolute;
-            background: rgba(0, 0, 0, 0.92);
-            color: white;
-            padding: 0.5rem 0.75rem;
-            border-radius: 2px;
-            font-size: 0.8125rem;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.15s ease;
-            z-index: 1000;
-            max-width: 250px;
-        }
-
-        .tooltip.visible {
-            opacity: 1;
-        }
-
-        /* ============================================
-           AUTO-SAVE NOTIFICATIE
-           ============================================ */
-        .auto-save-indicator {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            background: var(--color-score-high);
-            color: white;
-            padding: 0.625rem 1rem;
-            border-radius: 2px;
-            font-size: 0.8125rem;
-            font-weight: 500;
-            box-shadow: var(--shadow-sm);
-            opacity: 0;
-            transition: opacity 0.2s ease;
-            z-index: 1000;
-            pointer-events: none;
-        }
-
-        .auto-save-indicator.visible {
-            opacity: 1;
-        }
-
-        .auto-save-indicator::before {
-            content: '✓ ';
-            font-weight: bold;
-        }
-
-        /* Screen reader only content */
-        .sr-only {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border: 0;
-        }
-
-        /* Reflectieve Samenvatting */
-        .reflective-summary {
-            margin-top: 1rem;
-            padding: 0.75rem;
-            background: #fafaf9;
-            border-radius: 2px;
-            border: 1px solid var(--color-border);
-        }
-
-        .reflective-title {
-            font-size: 0.875rem;
-            margin-bottom: 0.5rem;
-            color: var(--color-text-primary);
-        }
-
-        .reflective-items {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .reflective-item {
-            padding: 0.5rem;
-            background: white;
-            border-radius: 2px;
-            border-left: 2px solid var(--color-score-medium);
-            cursor: pointer;
-            transition: border-color 0.2s ease;
-        }
-
-        .reflective-item:hover {
-            border-left-color: var(--color-vision);
-        }
-
-        .reflective-item-title {
-            font-size: 0.8125rem;
-            font-weight: 600;
-            color: var(--color-text-primary);
-            margin-bottom: 0.25rem;
-        }
-
-        .reflective-item-notes {
-            font-size: 0.75rem;
-            color: var(--color-text-secondary);
-            line-height: 1.4;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        /* Visie Sectie */
-        .vision-section-summary {
-            margin-top: 1rem;
-            padding: 0.75rem;
-            background: #fafaf9;
-            border-radius: 2px;
-            border: 1px solid var(--color-border);
-        }
-
-        .vision-title {
-            font-size: 0.875rem;
-            margin-bottom: 0.5rem;
-            color: var(--color-text-primary);
-        }
-
-        .vision-content {
-            font-size: 0.8125rem;
-            color: var(--color-text-primary);
-            line-height: 1.5;
-            white-space: normal;
-            overflow-wrap: break-word;
-            word-wrap: break-word;
-            word-break: break-word;
-            font-family: 'Work Sans', sans-serif;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sinterklaasklok</title>
+<meta name="description" content="Een gezellige Sinterklaasklok die de actuele tijd aangeeft, bij een knapperend haardvuur.">
+<meta name="theme-color" content="#1a0a0d">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M14 58V32C14 20 23 10 32 4c9 6 18 16 18 28v26z' fill='%23b3202a'/%3E%3Cpath d='M14 48h36v10H14z' fill='%23d9a93f'/%3E%3Cpath d='M29 14h6v8h8v6h-8v14h-6V28h-8v-6h8z' fill='%23f3d27a'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Cinzel:wght@600&family=Fraunces:opsz,wght@9..144,600&family=Nunito+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/*
+VOICE: warm en gezellig, een Hollandse woonkamer op een decemberavond
+IDEA: een antieke schoorsteenklok met een mijter als kroon, boven een brandende haard
+PICTURE: een gelaagde SVG-kamer met een canvas-vuur, kaarsen, chocoladeletter en een klomp met wortel
+COLOUR and TYPE: wijnrode wand, Sint-rood, goud, gloeiend oranje; Fraunces, Cinzel-cijfers, Nunito Sans
+LAYOUT: bescheiden titel, de kamer groot in het midden, tijd en aftellen eronder
+*/
+:root{color-scheme:dark;--bg:#1a0a0d;--ink:#f6e7c8;--muted:#d4b994;--red:#b3202a;--gold:#d9a93f;--goldl:#f3d27a;--glow:.5}
+*{box-sizing:border-box;min-width:0}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse 90% 70% at 50% 35%,#3d1117 0%,#1a0a0d 70%) no-repeat,#1a0a0d;color:var(--ink);font:16px/1.55 "Nunito Sans",system-ui,-apple-system,"Segoe UI",sans-serif;overflow-x:clip}
+.top{text-align:center;padding:clamp(18px,3vw,32px) max(5vw,16px) 0}
+h1{margin:0;font:600 clamp(32px,5vw,50px)/1.05 Fraunces,Georgia,serif;color:var(--goldl);text-wrap:balance}
+.top p{margin:6px 0 0;color:var(--muted);font-size:17px}
+.stage{position:relative;margin:4px auto 0;aspect-ratio:10/9;width:min(100%,1040px,max(560px,calc((100vh - 250px)*1.111)));-webkit-mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent),linear-gradient(180deg,transparent,#000 6%,#000 95%,transparent);-webkit-mask-composite:source-in;mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent),linear-gradient(180deg,transparent,#000 6%,#000 95%,transparent);mask-composite:intersect}
+@supports(height:100svh){.stage{width:min(100%,1040px,max(560px,calc((100svh - 250px)*1.111)))}}
+.stage>svg{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:hidden}
+#fire{position:absolute;left:33%;top:62.2222%;width:34%;height:26.6667%;display:block;border-radius:50% 50% 0 0/32.5% 32.5% 0 0}
+.glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 62% 48% at 50% 80%,rgba(255,150,60,.55),rgba(255,110,40,.16) 48%,transparent 72%);mix-blend-mode:screen;opacity:var(--glow)}
+.shoe{position:absolute;left:20%;top:85%;width:18%;height:13.5%;padding:0;margin:0;border:0;background:transparent;border-radius:14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.shoe:focus-visible{outline:3px solid var(--goldl);outline-offset:2px}
+.bubble{position:absolute;left:14%;bottom:17%;width:max-content;max-width:min(50%,340px);margin:0;padding:10px 14px;background:#f6e7c8;color:#3a170f;border-radius:14px;font-size:clamp(13px,1.7vw,16px);line-height:1.35;box-shadow:0 8px 24px rgba(0,0,0,.45);opacity:0;transform:translateY(6px);transition:opacity .25s,transform .25s;pointer-events:none}
+.bubble.show{opacity:1;transform:none}
+.bubble::after{content:"";position:absolute;left:30px;bottom:-8px;border:8px solid transparent;border-bottom:0;border-top-color:#f6e7c8}
+.panel{max-width:1040px;margin:0 auto;padding:8px max(5vw,16px) 8px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:16px 40px;align-items:center}
+.time{display:block;font:600 clamp(44px,7vw,68px)/1 Fraunces,Georgia,serif;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink)}
+.date{margin-top:8px;color:var(--muted);font-size:17px}
+.count{margin:0;font:600 clamp(20px,2.4vw,26px)/1.2 Fraunces,Georgia,serif;color:var(--goldl);text-wrap:balance}
+.sub{margin:6px 0 0;color:var(--muted)}
+.sound{min-height:44px;padding:0 20px;border-radius:999px;border:1px solid rgba(243,210,122,.55);background:rgba(243,210,122,.08);color:var(--ink);font:600 16px/1 "Nunito Sans",system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.sound:hover{background:rgba(243,210,122,.16)}
+.sound:focus-visible{outline:3px solid var(--goldl);outline-offset:3px}
+.sound.on{background:var(--gold);color:#2a1208;border-color:var(--gold)}
+.sound:disabled{opacity:.55;cursor:default}
+.hint{margin:14px auto 0;padding:0 16px;text-align:center;color:var(--muted);font-size:15px}
+footer{padding:20px 16px 32px;text-align:center;color:#a88c6c;font-size:14px}
+@media(max-width:720px){.panel{grid-template-columns:minmax(0,1fr);justify-items:center;text-align:center;gap:14px}}
+.flame{transform-box:fill-box;transform-origin:50% 100%;animation:flick 1.3s ease-in-out infinite alternate}
+.flame.b{animation-duration:1.7s;animation-delay:-.6s}
+.halo{animation:halo 2.1s ease-in-out infinite alternate}
+@keyframes flick{0%{transform:scale(1,1) skewX(0deg)}30%{transform:scale(.94,1.06) skewX(2deg)}60%{transform:scale(1.04,.95) skewX(-2deg)}100%{transform:scale(.97,1.04) skewX(1deg)}}
+@keyframes halo{from{opacity:.75}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.flame,.halo{animation:none}.bubble{transition:none}}
+</style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header role="banner">
-            <h1>Spinnenweb van Van den Akker</h1>
-            <p class="subtitle">Interactieve tool</p>
-        </header>
+<header class="top">
+  <h1>Sinterklaasklok</h1>
+  <p>Het vuur brandt, de klomp staat klaar.</p>
+</header>
 
-        <!-- Visie Sectie (Centrum van het Spinnenweb) -->
-        <section class="vision-section" aria-labelledby="vision-heading">
-            <h2 id="vision-heading">Visie (Centrum)</h2>
-            <p class="question" id="vision-question">Waartoe leren zij?</p>
-            <textarea 
-                id="visionInput" 
-                class="vision-input" 
-                placeholder="Beschrijf de visie van de opdracht. Wat is het overkoepelende doel? Waarom is dit leren belangrijk?"
-                aria-describedby="vision-question"
-                aria-label="Visie op onderwijs en leren"
-            ></textarea>
-        </section>
+<main>
+<div class="stage" id="stage">
+<svg viewBox="0 0 1000 900" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="paper" width="60" height="60" patternUnits="userSpaceOnUse">
+      <rect width="60" height="60" fill="#5a141a"/>
+      <path d="M30 4 46 30 30 56 14 30Z" fill="none" stroke="#6e1b22" stroke-width="2"/>
+      <circle cx="30" cy="30" r="3" fill="#d9a93f" opacity=".28"/>
+      <circle cx="0" cy="0" r="2.5" fill="#d9a93f" opacity=".18"/>
+      <circle cx="60" cy="0" r="2.5" fill="#d9a93f" opacity=".18"/>
+      <circle cx="0" cy="60" r="2.5" fill="#d9a93f" opacity=".18"/>
+      <circle cx="60" cy="60" r="2.5" fill="#d9a93f" opacity=".18"/>
+    </pattern>
+    <pattern id="brick" width="64" height="32" patternUnits="userSpaceOnUse">
+      <rect width="64" height="32" fill="#3a1912"/>
+      <rect x="1" y="1" width="62" height="14" rx="1.5" fill="#8b3f2c"/>
+      <rect x="-31" y="17" width="62" height="14" rx="1.5" fill="#7a3425"/>
+      <rect x="33" y="17" width="62" height="14" rx="1.5" fill="#7a3425"/>
+    </pattern>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a3a24"/><stop offset="1" stop-color="#341a10"/></linearGradient>
+    <linearGradient id="woodS" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2e170f"/><stop offset=".5" stop-color="#5a301e"/><stop offset="1" stop-color="#2e170f"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7de94"/><stop offset=".5" stop-color="#d9a93f"/><stop offset="1" stop-color="#8f6420"/></linearGradient>
+    <radialGradient id="face" cx=".45" cy=".4" r=".7"><stop offset="0" stop-color="#fff9ea"/><stop offset="1" stop-color="#e6d0a1"/></radialGradient>
+    <linearGradient id="mitre" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d4343e"/><stop offset="1" stop-color="#861520"/></linearGradient>
+    <linearGradient id="stone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a39484"/><stop offset="1" stop-color="#5c5047"/></linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f2416"/><stop offset="1" stop-color="#1f100a"/></linearGradient>
+    <radialGradient id="soot" cx=".5" cy=".85" r=".8"><stop offset="0" stop-color="#2a120a"/><stop offset="1" stop-color="#0b0504"/></radialGradient>
+    <radialGradient id="sootUp"><stop offset="0" stop-color="#000" stop-opacity=".6"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+    <radialGradient id="halo"><stop offset="0" stop-color="#ffd27a" stop-opacity=".55"/><stop offset=".4" stop-color="#ff9f3a" stop-opacity=".18"/><stop offset="1" stop-color="#ff9f3a" stop-opacity="0"/></radialGradient>
+    <linearGradient id="wax" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e9d8b4"/><stop offset=".45" stop-color="#fbf1dc"/><stop offset="1" stop-color="#cdb98f"/></linearGradient>
+    <linearGradient id="flameG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff8a1e"/><stop offset=".45" stop-color="#ffd25a"/><stop offset="1" stop-color="#fff6d8"/></linearGradient>
+    <linearGradient id="choc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#83502e"/><stop offset="1" stop-color="#3b1d0e"/></linearGradient>
+    <radialGradient id="vig" cx=".5" cy=".5" r=".72"><stop offset=".55" stop-color="#1a0a0d" stop-opacity="0"/><stop offset="1" stop-color="#1a0a0d" stop-opacity=".8"/></radialGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <radialGradient id="bob" cx=".35" cy=".35" r=".7"><stop offset="0" stop-color="#fff1b8"/><stop offset=".5" stop-color="#d9a93f"/><stop offset="1" stop-color="#7d5518"/></radialGradient>
+    <filter id="drop" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#000" flood-opacity=".5"/></filter>
+    <clipPath id="win"><rect x="466" y="322" width="68" height="86" rx="10"/></clipPath>
+  </defs>
 
-        <!-- Hoofdgrid: Invoer & Visualisatie -->
-        <main class="main-grid" role="main">
-            <!-- Linker kolom: Invoervelden voor de 9 draden -->
-            <section class="input-section" aria-labelledby="input-heading">
-                <h2 id="input-heading">Curriculumcomponenten (9 Draden)</h2>
-                <div id="threadsContainer" role="group" aria-label="Curriculumcomponenten scores en notities"></div>
-            </section>
+  <!-- wand, lambrisering, vloer -->
+  <rect width="1000" height="900" fill="url(#paper)"/>
+  <rect y="610" width="1000" height="222" fill="#3b0e13"/>
+  <rect x="34" y="642" width="118" height="160" rx="4" fill="none" stroke="#56161c" stroke-width="3"/>
+  <rect x="848" y="642" width="118" height="160" rx="4" fill="none" stroke="#56161c" stroke-width="3"/>
+  <rect y="602" width="1000" height="10" fill="#6b2a1c"/>
+  <rect y="611" width="1000" height="2" fill="#d9a93f" opacity=".35"/>
+  <rect y="830" width="1000" height="70" fill="url(#floor)"/>
+  <g stroke="#140a05" stroke-width="2" opacity=".7" fill="none">
+    <path d="M0 853H1000M0 877H1000"/>
+    <path d="M120 830V853M410 853V877M690 830V853M860 877V900M250 877V900M560 877V900M930 830V853M330 830V853"/>
+  </g>
+  <path d="M0 831H1000" stroke="#000" stroke-opacity=".5" stroke-width="3"/>
 
-            <!-- Rechter kolom: Spinnenweb Visualisatie -->
-            <aside class="visualization-section" aria-labelledby="viz-heading">
-                <h2 id="viz-heading">Spinnenweb Visualisatie</h2>
-                <div id="spiderWebContainer" role="img" aria-label="Spinnenweb diagram met scores voor curriculumcomponenten">
-                    <svg id="spiderWebSVG" viewBox="0 0 600 600" aria-hidden="true"></svg>
-                </div>
+  <!-- slinger -->
+  <path d="M-10 26Q500 126 1010 26" fill="none" stroke="#e8d2a2" stroke-width="2"/>
+  <g id="bunting"></g>
 
-                <!-- Legenda -->
-                <div class="legend" aria-labelledby="legend-heading">
-                    <h3 id="legend-heading">Legenda</h3>
-                    <div class="legend-items" role="list">
-                        <div class="legend-item" role="listitem">
-                            <div class="legend-color" style="background: var(--color-score-high);" aria-hidden="true"></div>
-                            <span>Sterk (4-5)</span>
-                        </div>
-                        <div class="legend-item" role="listitem">
-                            <div class="legend-color" style="background: var(--color-score-medium);" aria-hidden="true"></div>
-                            <span>Aandacht (3)</span>
-                        </div>
-                        <div class="legend-item" role="listitem">
-                            <div class="legend-color" style="background: var(--color-score-low);" aria-hidden="true"></div>
-                            <span>Zwak (1-2)</span>
-                        </div>
-                    </div>
-                </div>
+  <!-- schoorsteen -->
+  <g filter="url(#drop)">
+    <rect x="190" y="450" width="620" height="350" fill="#3a1e14"/>
+    <rect x="190" y="450" width="64" height="350" fill="url(#woodS)"/>
+    <rect x="746" y="450" width="64" height="350" fill="url(#woodS)"/>
+    <path d="M206 476V790M222 476V790M238 476V790M762 476V790M778 476V790M794 476V790" stroke="#1d0d07" stroke-opacity=".55" stroke-width="2"/>
+    <rect x="254" y="456" width="492" height="46" fill="url(#wood)"/>
+    <rect x="276" y="466" width="448" height="26" rx="4" fill="none" stroke="#d9a93f" stroke-opacity=".45" stroke-width="1.5"/>
+    <ellipse cx="500" cy="479" rx="22" ry="8" fill="url(#gold)"/>
+    <rect x="254" y="502" width="492" height="298" fill="url(#brick)"/>
+    <ellipse cx="500" cy="575" rx="230" ry="90" fill="url(#sootUp)"/>
+    <path d="M322 800V638A178 86 0 0 1 678 638V800" fill="none" stroke="url(#stone)" stroke-width="16"/>
+    <path d="M486 541h28l-4 26h-20z" fill="#a89888" stroke="#5c5047" stroke-width="1.5"/>
+    <path d="M330 800V638A170 78 0 0 1 670 638V800Z" fill="url(#soot)"/>
+    <path d="M362 800V662A138 58 0 0 1 638 662V800Z" fill="url(#brick)" opacity=".2"/>
+    <path d="M196 454h32v10c0 14-10 24-22 30h-10z" fill="#4a2618"/>
+    <path d="M804 454h-32v10c0 14 10 24 22 30h10z" fill="#4a2618"/>
+    <rect x="176" y="440" width="648" height="16" fill="#4a2618"/>
+    <rect x="160" y="426" width="680" height="16" rx="3" fill="url(#wood)"/>
+    <path d="M162 427.5H838" stroke="#f3c98a" stroke-opacity=".35" stroke-width="1.5"/>
+    <rect x="206" y="800" width="588" height="30" fill="url(#stone)"/>
+    <path d="M206 801H794" stroke="#d4c4b0" stroke-opacity=".6" stroke-width="1.5"/>
+  </g>
 
-                <!-- Reflectieve Samenvatting -->
-                <div id="reflectiveSummary" class="reflective-summary" style="display: none;" aria-labelledby="reflective-heading">
-                    <h3 id="reflective-heading" class="reflective-title">Componenten die aandacht vragen</h3>
-                    <div id="reflectiveItems" class="reflective-items" role="list"></div>
-                </div>
+  <!-- chocoladeletter -->
+  <text x="255" y="429" text-anchor="middle" font-family="'Archivo Black','Arial Black',Impact,sans-serif" font-size="112" fill="#241006">J</text>
+  <text x="250" y="425" text-anchor="middle" font-family="'Archivo Black','Arial Black',Impact,sans-serif" font-size="112" fill="url(#choc)" stroke="#a46a40" stroke-opacity=".5" stroke-width="1">J</text>
 
-                <!-- Visie Sectie -->
-                <div id="visionSection" class="vision-section-summary" style="display: none;" aria-labelledby="vision-summary-heading">
-                    <h3 id="vision-summary-heading" class="vision-title">Visie (centrum van het spinnenweb)</h3>
-                    <div id="visionItems" class="reflective-items">
-                        <div class="reflective-item">
-                            <div id="visionContent" class="vision-content"></div>
-                        </div>
-                    </div>
-                </div>
+  <!-- kaarsen -->
+  <circle class="halo" cx="345" cy="340" r="64" fill="url(#halo)"/>
+  <rect x="335" y="356" width="20" height="66" rx="3" fill="url(#wax)"/>
+  <path d="M341 356c0 6 2 10 0 16c3-2 4-8 4-16z" fill="#f7ecd2"/>
+  <path d="M345 352V358" stroke="#2a1a10" stroke-width="1.6"/>
+  <path class="flame" d="M345 357C337 351 338 341 345 329C352 341 353 351 345 357Z" fill="url(#flameG)"/>
+  <ellipse cx="345" cy="352" rx="2" ry="3.5" fill="#fff" opacity=".8"/>
+  <ellipse cx="345" cy="423" rx="20" ry="5" fill="url(#gold)"/>
 
-                <!-- Export Knoppen -->
-                <div class="export-buttons no-export" role="group" aria-label="Export en beheer opties">
-                    <button class="btn btn-primary" onclick="exportAsPNG()" aria-label="Exporteer visualisatie als PNG afbeelding">Export PNG</button>
-                    <button class="btn btn-primary" onclick="exportAsPDF()" aria-label="Exporteer rapport als PDF document">Export PDF</button>
-                    <button class="btn btn-secondary" onclick="window.print()" aria-label="Print pagina">Printen</button>
-                    <button class="btn btn-secondary" onclick="exportAsJSON()" aria-label="Sla gegevens op als JSON bestand">Opslaan</button>
-                    <button class="btn btn-secondary" onclick="loadFromJSON()" aria-label="Laad gegevens uit JSON bestand">Laden</button>
-                    <button class="btn btn-secondary" onclick="clearAllData()" style="background: #ffebee; color: #c94545; border-color: #c94545;" aria-label="Wis alle gegevens">Wissen</button>
-                </div>
-            </aside>
-        </main>
-    </div>
+  <circle class="halo" cx="655" cy="352" r="64" fill="url(#halo)"/>
+  <rect x="645" y="368" width="20" height="54" rx="3" fill="url(#wax)"/>
+  <path d="M659 368c0 5-2 9 0 14c-3-2-4-7-4-14z" fill="#f7ecd2"/>
+  <path d="M655 364V370" stroke="#2a1a10" stroke-width="1.6"/>
+  <path class="flame b" d="M655 369C647 363 648 353 655 341C662 353 663 363 655 369Z" fill="url(#flameG)"/>
+  <ellipse cx="655" cy="364" rx="2" ry="3.5" fill="#fff" opacity=".8"/>
+  <ellipse cx="655" cy="423" rx="20" ry="5" fill="url(#gold)"/>
 
-    <!-- Tooltip element -->
-    <div id="tooltip" class="tooltip" role="tooltip" aria-live="polite"></div>
+  <!-- cadeautjes -->
+  <g filter="url(#drop)">
+    <rect x="704" y="372" width="92" height="54" rx="3" fill="#b3202a"/>
+    <g fill="#f3d27a" opacity=".45"><circle cx="716" cy="384" r="3"/><circle cx="732" cy="414" r="3"/><circle cx="774" cy="382" r="3"/><circle cx="786" cy="414" r="3"/></g>
+    <rect x="744" y="372" width="12" height="54" fill="url(#gold)"/>
+    <rect x="704" y="393" width="92" height="10" fill="url(#gold)"/>
+    <rect x="722" y="330" width="58" height="42" rx="3" fill="#f3e6c8"/>
+    <rect x="746" y="330" width="10" height="42" fill="#b3202a"/>
+    <rect x="722" y="346" width="58" height="8" fill="#b3202a"/>
+    <path d="M751 331c-14-14-28-8-20 2c6 6 13 2 20-2zM751 331c14-14 28-8 20 2c-6 6-13 2-20-2z" fill="#b3202a" stroke="#7d1219" stroke-width="1"/>
+  </g>
 
-    <!-- Auto-save indicator -->
-    <div id="autoSaveIndicator" class="auto-save-indicator" role="status" aria-live="polite" aria-atomic="true">Automatisch opgeslagen</div>
+  <!-- klok met mijter -->
+  <g filter="url(#drop)">
+    <circle cx="500" cy="34" r="6" fill="url(#gold)"/>
+    <path d="M432 152C428 104 462 66 500 36C538 66 572 104 568 152Z" fill="url(#mitre)"/>
+    <path d="M432 152C428 104 462 66 500 36C538 66 572 104 568 152" fill="none" stroke="url(#gold)" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M494 70h12v16h16v12h-16v30h-12V98h-16V86h16z" fill="#f3d27a"/>
+    <rect x="426" y="140" width="148" height="16" rx="3" fill="url(#gold)"/>
+    <rect x="414" y="154" width="172" height="266" rx="16" fill="url(#wood)" stroke="#1f0f09" stroke-width="2"/>
+    <rect x="424" y="164" width="152" height="246" rx="10" fill="none" stroke="#d9a93f" stroke-opacity=".55" stroke-width="1.5"/>
+    <circle cx="500" cy="236" r="76" fill="url(#gold)"/>
+    <circle cx="500" cy="236" r="71" fill="#8f6420"/>
+    <circle cx="500" cy="236" r="69" fill="url(#face)"/>
+    <circle cx="500" cy="236" r="38" fill="none" stroke="#b08a52" stroke-opacity=".45"/>
+    <g id="dial"></g>
+    <g id="hh" transform="translate(500 236)"><path d="M-3.5 8L-3 -20C-9 -23 -9 -32 0 -38C9 -32 9 -23 3 -20L3.5 8Z" fill="#2a140c"/></g>
+    <g id="mh" transform="translate(500 236)"><path d="M-2.4 10L-1.8 -44L0 -57L1.8 -44L2.4 10Z" fill="#2a140c"/></g>
+    <g id="sh" transform="translate(500 236)"><path d="M0 16V-60" stroke="#b3202a" stroke-width="1.3"/><circle r="3.2" fill="#b3202a"/><circle cy="-46" r="2.6" fill="none" stroke="#b3202a" stroke-width="1.3"/></g>
+    <circle cx="500" cy="236" r="4.5" fill="url(#gold)" stroke="#5a3a12" stroke-width="1"/>
+    <path d="M446 204A60 60 0 0 1 532 182" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="5" stroke-linecap="round"/>
+    <rect x="466" y="322" width="68" height="86" rx="10" fill="#140904"/>
+    <g clip-path="url(#win)"><g id="pend"><path d="M500 314V390" stroke="#d9a93f" stroke-width="2.5"/><circle cx="500" cy="390" r="13" fill="url(#bob)"/></g></g>
+    <rect x="466" y="322" width="68" height="86" rx="10" fill="url(#glass)" stroke="url(#gold)" stroke-width="3"/>
+    <ellipse cx="436" cy="423" rx="13" ry="4" fill="url(#gold)"/>
+    <ellipse cx="564" cy="423" rx="13" ry="4" fill="url(#gold)"/>
+  </g>
 
-    <!-- Hidden file input voor JSON import -->
-    <input type="file" id="jsonFileInput" accept=".json" style="display: none;">
+  <!-- staf -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M880 886L850 360" stroke="#000" stroke-opacity=".25" stroke-width="10"/>
+    <path d="M872 884L842 356" stroke="#6b4a14" stroke-width="12"/>
+    <path d="M872 884L842 356" stroke="#d9a93f" stroke-width="8"/>
+    <path d="M868 878L840 362" stroke="#f7de94" stroke-width="2" stroke-opacity=".7"/>
+    <path d="M842 356C836 286 902 262 916 316C924 346 894 358 880 338C872 326 884 312 896 320" stroke="#6b4a14" stroke-width="12"/>
+    <path d="M842 356C836 286 902 262 916 316C924 346 894 358 880 338C872 326 884 312 896 320" stroke="#d9a93f" stroke-width="8"/>
+  </g>
+  <ellipse cx="843" cy="374" rx="10" ry="7" fill="url(#gold)"/>
 
-    <script>
-        // ============================================
-        // DATA STRUCTUUR: SLO-model draden
-        // ============================================
-        const threads = [
-            {
-                id: 'goals',
-                title: 'Leerdoelen',
-                question: 'Waarheen leren zij?',
-                score: 3,
-                notes: ''
-            },
-            {
-                id: 'content',
-                title: 'Leerinhoud',
-                question: 'Wat leren zij?',
-                score: 3,
-                notes: ''
-            },
-            {
-                id: 'activities',
-                title: 'Leeractiviteiten',
-                question: 'Hoe leren zij?',
-                score: 3,
-                notes: ''
-            },
-            {
-                id: 'teacher',
-                title: 'Docentenrollen',
-                question: 'Wat is de rol van de leraar bij hun leren?',
-                score: 3,
-                notes: ''
-            },
-            {
-                id: 'resources',
-                title: 'Bronnen en materialen',
-                question: 'Waarmee leren zij?',
-                score: 3,
-                notes: ''
-            },
-            {
-                id: 'grouping',
-                title: 'Groeperingsvormen',
-                question: 'Met wie leren zij?',
-                score: 3,
-                notes: ''
-            },
-            {
-                id: 'location',
-                title: 'Leeromgeving',
-                question: 'Waar leren zij?',
-                score: 3,
-                notes: ''
-            },
-            {
-                id: 'time',
-                title: 'Tijd',
-                question: 'Wanneer leren zij?',
-                score: 3,
-                notes: ''
-            },
-            {
-                id: 'assessment',
-                title: 'Toetsing',
-                question: 'Hoe wordt hun leren getoetst?',
-                score: 3,
-                notes: ''
-            }
-        ];
+  <rect width="1000" height="900" fill="url(#vig)"/>
+</svg>
 
-        let visionText = '';
-        let autoSaveTimeout = null;
+<canvas id="fire" aria-hidden="true"></canvas>
 
-        // ============================================
-        // LOCALSTORAGE FUNCTIES
-        // ============================================
-        function saveToLocalStorage() {
-            const data = {
-                vision: document.getElementById('visionInput').value,
-                threads: threads,
-                lastSaved: new Date().toISOString()
-            };
-            localStorage.setItem('slo-spinnenweb-data', JSON.stringify(data));
-            showAutoSaveIndicator();
-        }
+<svg viewBox="0 0 1000 900" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="klomp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4d27a"/><stop offset="1" stop-color="#c08a2a"/></linearGradient>
+    <g id="pn"><ellipse cy="5" rx="7" ry="2.2" fill="#000" opacity=".3"/><circle r="7" fill="#8e4f25"/><circle cx="-2" cy="-2.5" r="3" fill="#c98a52" opacity=".7"/></g>
+  </defs>
+  <g>
+    <use href="#pn" x="602" y="858"/><use href="#pn" x="618" y="868"/><use href="#pn" x="632" y="851"/>
+    <use href="#pn" x="646" y="874"/><use href="#pn" x="664" y="860"/><use href="#pn" x="680" y="880"/>
+    <use href="#pn" x="588" y="880"/><use href="#pn" x="702" y="866"/><use href="#pn" x="654" y="844"/>
+  </g>
+  <g transform="translate(222 834) scale(.9)">
+    <ellipse cx="84" cy="60" rx="82" ry="7" fill="#000" opacity=".45"/>
+    <path d="M8 22C6 42 14 58 32 60L132 60C152 60 162 50 160 40C158 30 142 25 122 23L74 18C66 10 46 6 26 8C14 10 9 14 8 22Z" fill="url(#klomp)" stroke="#8a5a18" stroke-width="1.5"/>
+    <path d="M30 28C60 25 100 29 142 33" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="3" stroke-linecap="round"/>
+    <path d="M62 50C92 46 122 41 152 39" fill="none" stroke="#b3202a" stroke-width="3" stroke-linecap="round"/>
+    <g fill="#b3202a"><circle cx="104" cy="35" r="3"/><circle cx="110" cy="33" r="3"/><circle cx="107" cy="39" r="3"/></g>
+    <ellipse cx="40" cy="14" rx="24" ry="5.5" fill="#3b200c"/>
+    <g id="carrot">
+      <path d="M34 16L64 -38Q70 -45 77 -36L43 18Z" fill="#ef8424"/>
+      <path d="M48 -6l6 3M56 -20l6 3M42 6l5 3" stroke="#c35f12" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M68 -40C62 -56 58 -62 52 -64M70 -41C70 -58 72 -64 76 -68M73 -40C80 -54 86 -58 92 -58" fill="none" stroke="#4f8a3a" stroke-width="3" stroke-linecap="round"/>
+    </g>
+    <g id="gift" style="display:none">
+      <rect x="24" y="-14" width="30" height="26" rx="2" fill="#b3202a"/>
+      <rect x="36" y="-14" width="6" height="26" fill="#f3d27a"/>
+      <rect x="24" y="-4" width="30" height="5" fill="#f3d27a"/>
+      <ellipse cx="34" cy="-17" rx="6" ry="3.5" fill="#f3d27a"/>
+      <ellipse cx="44" cy="-17" rx="6" ry="3.5" fill="#f3d27a"/>
+      <circle cx="58" cy="6" r="7" fill="#d9a93f" stroke="#8f6420"/>
+    </g>
+    <path d="M16 15A24 5.5 0 0 0 64 15" fill="none" stroke="#e5bd62" stroke-width="3"/>
+  </g>
+</svg>
 
-        function loadFromLocalStorage() {
-            const savedData = localStorage.getItem('slo-spinnenweb-data');
-            if (savedData) {
-                try {
-                    const data = JSON.parse(savedData);
-                    
-                    // Update vision
-                    if (data.vision) {
-                        document.getElementById('visionInput').value = data.vision;
-                        visionText = data.vision;
-                    }
-                    
-                    // Update threads
-                    if (data.threads && Array.isArray(data.threads)) {
-                        data.threads.forEach(savedThread => {
-                            const thread = threads.find(t => t.id === savedThread.id);
-                            if (thread) {
-                                thread.score = savedThread.score;
-                                thread.notes = savedThread.notes;
-                            }
-                        });
-                    }
-                    
-                    return true;
-                } catch (error) {
-                    console.error('Error loading from localStorage:', error);
-                    return false;
-                }
-            }
-            return false;
-        }
+<div class="glow" aria-hidden="true"></div>
+<button class="shoe" id="shoe" type="button" aria-label="Kijk in de klomp"></button>
+<p class="bubble" id="bubble" role="status" aria-live="polite"></p>
+</div>
 
-        function showAutoSaveIndicator() {
-            const indicator = document.getElementById('autoSaveIndicator');
-            indicator.classList.add('visible');
-            setTimeout(() => {
-                indicator.classList.remove('visible');
-            }, 2000);
-        }
+<section class="panel" aria-label="Tijd en aftellen">
+  <div>
+    <time class="time" id="dtime">00:00:00</time>
+    <div class="date" id="ddate"></div>
+  </div>
+  <div>
+    <p class="count" id="count"></p>
+    <p class="sub" id="count2"></p>
+  </div>
+  <button class="sound" id="sound" type="button">Haardgeluid aanzetten</button>
+</section>
+<p class="hint">Klik op de klomp om te kijken of Sinterklaas al langs is geweest.</p>
+</main>
 
-        function triggerAutoSave() {
-            // Debounce: wacht 1 seconde na laatste wijziging
-            clearTimeout(autoSaveTimeout);
-            autoSaveTimeout = setTimeout(() => {
-                saveToLocalStorage();
-            }, 1000);
-        }
+<footer>Fijne Sinterklaastijd!</footer>
 
-        function clearAllData() {
-            if (confirm('Weet je zeker dat je alle gegevens wilt wissen? Dit kan niet ongedaan worden gemaakt.')) {
-                localStorage.removeItem('slo-spinnenweb-data');
-                location.reload();
-            }
-        }
+<script>
+{
+const $ = id => document.getElementById(id);
+const R = Math.random;
+const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
-        // ============================================
-        // FUNCTIE: Genereer invoervelden
-        // ============================================
-        function generateThreadInputs() {
-            const container = document.getElementById('threadsContainer');
-            
-            threads.forEach((thread, index) => {
-                const threadDiv = document.createElement('div');
-                threadDiv.className = 'thread-item';
-                
-                threadDiv.innerHTML = `
-                    <div class="thread-header">
-                        <div>
-                            <div class="thread-title">${thread.title}</div>
-                            <div class="thread-question">${thread.question}</div>
-                        </div>
-                    </div>
-                    
-                    <div class="score-label">Score (1 = zwak, 5 = sterk):</div>
-                    <div class="score-control" role="radiogroup" aria-labelledby="score-label-${thread.id}">
-                        <span id="score-label-${thread.id}" class="sr-only">Score voor ${thread.title}</span>
-                        ${[1, 2, 3, 4, 5].map(score => `
-                            <button 
-                                type="button"
-                                class="score-button score-${score} ${thread.score === score ? 'active' : ''}" 
-                                onclick="setScore('${thread.id}', ${score}, event)"
-                                aria-pressed="${thread.score === score ? 'true' : 'false'}"
-                                aria-label="Score ${score} voor ${thread.title}"
-                            >
-                                ${score}
-                            </button>
-                        `).join('')}
-                    </div>
-                    
-                    <textarea 
-                        class="thread-notes" 
-                        placeholder="Toelichting: waarom deze score? Wat zijn sterke punten of verbeterpunten?"
-                        onchange="updateNotes('${thread.id}', this.value)"
-                        aria-label="Notities voor ${thread.title}"
-                        id="notes-${thread.id}"
-                    >${thread.notes}</textarea>
-                `;
-                
-                container.appendChild(threadDiv);
-            });
-        }
+/* wijzerplaat */
+const roman = ['XII','I','II','III','IIII','V','VI','VII','VIII','IX','X','XI'];
+let dial = '';
+for (let i = 0; i < 60; i++) {
+  const a = i * Math.PI / 30, major = i % 5 === 0, r1 = major ? 56 : 61, r2 = 65, s = Math.sin(a), c = Math.cos(a);
+  dial += `<line x1="${(500 + s * r1).toFixed(2)}" y1="${(236 - c * r1).toFixed(2)}" x2="${(500 + s * r2).toFixed(2)}" y2="${(236 - c * r2).toFixed(2)}" stroke="#3a1a10" stroke-width="${major ? 2.2 : 1}" stroke-linecap="round"/>`;
+}
+for (let k = 0; k < 12; k++) {
+  dial += `<text x="500" y="188" transform="rotate(${k * 30} 500 236)" text-anchor="middle" dominant-baseline="central" font-family="Cinzel, Georgia, serif" font-weight="600" font-size="10.5" fill="#3a1a10">${roman[k]}</text>`;
+}
+$('dial').innerHTML = dial;
 
-        // ============================================
-        // FUNCTIE: Update visie sectie
-        // ============================================
-        function updateVisionSection() {
-            const visionSection = document.getElementById('visionSection');
-            const visionContent = document.getElementById('visionContent');
-            const visionText = document.getElementById('visionInput').value;
-            
-            if (visionText && visionText.trim().length > 0) {
-                visionSection.style.display = 'block';
-                visionContent.textContent = visionText.trim();
-            } else {
-                visionSection.style.display = 'none';
-            }
-        }
+/* slinger met vlaggetjes */
+const cols = ['#b3202a', '#d9a93f', '#f3e6c8'];
+const P0 = [-10, 26], P1 = [500, 126], P2 = [1010, 26];
+let flags = '';
+const nFlags = 22;
+for (let i = 0; i < nFlags; i++) {
+  const t = (i + 0.5) / nFlags, u = 1 - t;
+  const x = u * u * P0[0] + 2 * u * t * P1[0] + t * t * P2[0];
+  const y = u * u * P0[1] + 2 * u * t * P1[1] + t * t * P2[1];
+  const dx = 2 * u * (P1[0] - P0[0]) + 2 * t * (P2[0] - P1[0]);
+  const dy = 2 * u * (P1[1] - P0[1]) + 2 * t * (P2[1] - P1[1]);
+  const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+  flags += `<path d="M-19 0L19 0L0 44Z" fill="${cols[i % 3]}" stroke="#000" stroke-opacity=".2" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${ang.toFixed(1)})"/>`;
+}
+$('bunting').innerHTML = flags;
 
-        // ============================================
-        // FUNCTIE: Update reflectieve samenvatting
-        // ============================================
-        function updateReflectiveSummary() {
-            const summaryContainer = document.getElementById('reflectiveSummary');
-            const itemsContainer = document.getElementById('reflectiveItems');
-            
-            // Filter items met score ≤ 3
-            const attentionItems = threads.filter(thread => thread.score <= 3);
-            
-            if (attentionItems.length === 0) {
-                summaryContainer.style.display = 'none';
-                return;
-            }
-            
-            // Toon samenvatting
-            summaryContainer.style.display = 'block';
-            
-            // Genereer HTML voor items
-            itemsContainer.innerHTML = attentionItems.map(thread => {
-                const notesPreview = thread.notes 
-                    ? thread.notes.length > 120 
-                        ? thread.notes.substring(0, 120) + '...' 
-                        : thread.notes
-                    : 'Geen toelichting';
-                
-                return `
-                    <div class="reflective-item" onclick="scrollToThread('${thread.id}')" role="listitem" tabindex="0" onkeydown="handleReflectiveKeydown(event, '${thread.id}')">
-                        <div class="reflective-item-title">${thread.title}</div>
-                        <div class="reflective-item-notes">${notesPreview}</div>
-                    </div>
-                `;
-            }).join('');
-        }
+/* geluid */
+let ac = null, master = null, wbuf = null, soundOn = false, crackT = null;
+function initAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  ac = new AC();
+  master = ac.createGain();
+  master.gain.value = 0;
+  master.connect(ac.destination);
+  const len = Math.floor(ac.sampleRate * 3);
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < len; i++) { const w = R() * 2 - 1; last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
+  const src = ac.createBufferSource();
+  src.buffer = buf; src.loop = true;
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 500;
+  const g = ac.createGain(); g.gain.value = 0.35;
+  src.connect(lp); lp.connect(g); g.connect(master);
+  src.start();
+  wbuf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.2), ac.sampleRate);
+  const wd = wbuf.getChannelData(0);
+  for (let i = 0; i < wd.length; i++) wd[i] = R() * 2 - 1;
+}
+function burst(freq, q, vol, dur, delay) {
+  const n = ac.currentTime + delay;
+  const src = ac.createBufferSource(); src.buffer = wbuf;
+  const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = q;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol, n);
+  g.gain.exponentialRampToValueAtTime(0.0001, n + dur);
+  src.connect(bp); bp.connect(g); g.connect(master);
+  src.start(n, R() * 0.1, dur + 0.02);
+}
+function crackleLoop() {
+  if (!soundOn) return;
+  const count = R() < 0.15 ? 3 + Math.floor(R() * 4) : 1;
+  for (let i = 0; i < count; i++) burst(1200 + R() * 4000, 1 + R() * 3, 0.05 + R() * 0.35, 0.02 + R() * 0.06, i * 0.015 + R() * 0.02);
+  crackT = setTimeout(crackleLoop, 40 + R() * 260);
+}
+function tick(hi) { if (ac) burst(hi ? 3400 : 2600, 6, 0.5, 0.035, 0); }
+const btn = $('sound');
+btn.addEventListener('click', () => {
+  try {
+    if (!ac) initAudio();
+    soundOn = !soundOn;
+    btn.textContent = soundOn ? 'Haardgeluid uitzetten' : 'Haardgeluid aanzetten';
+    btn.classList.toggle('on', soundOn);
+    clearTimeout(crackT);
+    master.gain.cancelScheduledValues(ac.currentTime);
+    if (soundOn) {
+      const p = ac.resume(); if (p && p.catch) p.catch(() => {});
+      master.gain.setTargetAtTime(0.8, ac.currentTime, 0.15);
+      crackleLoop();
+    } else {
+      master.gain.setTargetAtTime(0, ac.currentTime, 0.08);
+    }
+  } catch (e) {
+    soundOn = false;
+    btn.disabled = true;
+    btn.classList.remove('on');
+    btn.textContent = 'Geluid niet beschikbaar';
+  }
+});
 
-        // ============================================
-        // FUNCTIE: Scroll naar thread
-        // ============================================
-        function scrollToThread(threadId) {
-            const threadElement = document.getElementById(`notes-${threadId}`);
-            if (threadElement) {
-                threadElement.scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'center' 
-                });
-                threadElement.focus();
-            }
-        }
+/* klok, datum en aftellen */
+const hh = $('hh'), mh = $('mh'), sh = $('sh'), pend = $('pend');
+const tEl = $('dtime'), dEl = $('ddate'), cEl = $('count'), c2El = $('count2');
+const fmtDate = new Intl.DateTimeFormat('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const fmtWd = new Intl.DateTimeFormat('nl-NL', { weekday: 'long' });
+const pad = n => String(n).padStart(2, '0');
+let lastSec = -1, lastDay = '';
+function easeTick(p) {
+  if (reduce || p >= 0.18) return 1;
+  const q = p / 0.18, c1 = 1.2, c3 = c1 + 1;
+  return 1 + c3 * Math.pow(q - 1, 3) + c1 * Math.pow(q - 1, 2);
+}
+function updDay(now) {
+  const ds = fmtDate.format(now);
+  dEl.textContent = ds.charAt(0).toUpperCase() + ds.slice(1);
+  const y = now.getFullYear(), day = 864e5;
+  const today = Date.UTC(y, now.getMonth(), now.getDate());
+  const d = Math.round((Date.UTC(y, 11, 5) - today) / day);
+  let main, sub;
+  if (d > 1) { main = `Nog ${d} nachtjes slapen tot pakjesavond`; sub = `Pakjesavond valt dit jaar op ${fmtWd.format(new Date(y, 11, 5))} 5 december.`; }
+  else if (d === 1) { main = 'Nog 1 nachtje slapen: morgen is het pakjesavond!'; sub = `Morgen, ${fmtWd.format(new Date(y, 11, 5))} 5 december, komt Sinterklaas langs.`; }
+  else if (d === 0) { main = 'Vanavond is het pakjesavond!'; sub = 'Luister goed: zo wordt er op de deur gebonsd.'; }
+  else if (d === -1) { main = 'Vandaag is Sinterklaas jarig!'; sub = 'Gefeliciteerd, Sint, en bedankt voor alle cadeautjes.'; }
+  else {
+    const d2 = Math.round((Date.UTC(y + 1, 11, 5) - today) / day);
+    main = `Sinterklaas is terug in Spanje. Nog ${d2} nachtjes tot pakjesavond`;
+    sub = `Volgend jaar valt pakjesavond op ${fmtWd.format(new Date(y + 1, 11, 5))} 5 december.`;
+  }
+  cEl.textContent = main;
+  c2El.textContent = sub;
+}
+function updClock(now) {
+  const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds(), ms = now.getMilliseconds();
+  const sf = s - 1 + easeTick(ms / 1000);
+  sh.setAttribute('transform', `translate(500 236) rotate(${(sf * 6).toFixed(2)})`);
+  mh.setAttribute('transform', `translate(500 236) rotate(${((m + s / 60) * 6).toFixed(2)})`);
+  hh.setAttribute('transform', `translate(500 236) rotate(${((h % 12 + m / 60) * 30).toFixed(2)})`);
+  const pa = reduce ? 0 : 7 * Math.sin(Math.PI * (now.getTime() % 2000) / 1000);
+  pend.setAttribute('transform', `rotate(${pa.toFixed(2)} 500 314)`);
+  if (s !== lastSec) {
+    lastSec = s;
+    tEl.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+    tEl.setAttribute('datetime', `${pad(h)}:${pad(m)}:${pad(s)}`);
+    if (soundOn) tick(s % 2 === 0);
+    const dk = now.toDateString();
+    if (dk !== lastDay) { lastDay = dk; updDay(now); }
+  }
+}
 
-        // ============================================
-        // FUNCTIE: Handle keyboard voor reflectieve items
-        // ============================================
-        function handleReflectiveKeydown(event, threadId) {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                scrollToThread(threadId);
-            }
-        }
+/* haardvuur */
+const stage = $('stage'), cv = $('fire'), cx = cv.getContext('2d');
+const FW = 340, FH = 240;
+function fit() {
+  const r = cv.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  cx.setTransform(w / FW, 0, 0, h / FH, 0, 0);
+}
+const fireObserver = new ResizeObserver(fit);
+fireObserver.observe(cv);
+fit();
 
-        // ============================================
-        // FUNCTIE: Update score
-        // ============================================
-        function setScore(threadId, score, event) {
-            const thread = threads.find(t => t.id === threadId);
-            if (thread) {
-                thread.score = score;
-                
-                // Update button styling
-                const buttons = document.querySelectorAll(`button[onclick*="${threadId}"]`);
-                buttons.forEach(btn => {
-                    btn.classList.remove('active');
-                });
-                event.target.classList.add('active');
-                
-                // Redraw spider web
-                drawSpiderWeb();
-                
-                // Update reflective summary
-                updateReflectiveSummary();
-                
-                // Auto-save
-                triggerAutoSave();
-            }
-        }
+const stops = [[0, [255, 247, 214]], [0.25, [255, 206, 96]], [0.55, [245, 124, 36]], [0.8, [170, 52, 22]], [1, [90, 24, 14]]];
+function col(t) {
+  for (let i = 1; i < stops.length; i++) {
+    if (t <= stops[i][0]) {
+      const t0 = stops[i - 1][0], a = stops[i - 1][1], t1 = stops[i][0], b = stops[i][1], f = (t - t0) / (t1 - t0);
+      return a.map((v, j) => Math.round(v + (b[j] - v) * f));
+    }
+  }
+  return stops[stops.length - 1][1];
+}
+const sprites = [];
+for (let i = 0; i < 24; i++) {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), rgb = col(i / 23).join(',');
+  const rg = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  rg.addColorStop(0, `rgba(${rgb},1)`); rg.addColorStop(0.35, `rgba(${rgb},.55)`); rg.addColorStop(1, `rgba(${rgb},0)`);
+  g.fillStyle = rg; g.fillRect(0, 0, 64, 64);
+  sprites.push(c);
+}
+const parts = [], sparks = [];
+let acc = 0, noise = 0;
+function spawn() {
+  parts.push({ x: 170 + (R() + R() + R() - 1.5) * 64, y: 202 + R() * 12, vx: (R() - 0.5) * 14, vy: -(55 + R() * 65), life: 0, max: 0.9 + R() * 1.0, size: 26 + R() * 26, seed: R() * 6.28 });
+}
+function drawLog(x1, y1, x2, y2, r, glow) {
+  const a = Math.atan2(y2 - y1, x2 - x1), len = Math.hypot(x2 - x1, y2 - y1);
+  cx.save();
+  cx.translate(x1, y1); cx.rotate(a);
+  const g = cx.createLinearGradient(0, -r, 0, r);
+  g.addColorStop(0, '#6a3e24'); g.addColorStop(0.5, '#3e2213'); g.addColorStop(1, '#1e0f07');
+  cx.fillStyle = g;
+  cx.beginPath(); cx.ellipse(0, 0, r * 0.45, r, 0, 0, Math.PI * 2); cx.fill();
+  cx.fillRect(0, -r, len, 2 * r);
+  cx.strokeStyle = 'rgba(0,0,0,.35)'; cx.lineWidth = 1.2;
+  cx.beginPath();
+  cx.moveTo(8, -r * 0.3); cx.lineTo(len * 0.55, -r * 0.35);
+  cx.moveTo(len * 0.3, r * 0.25); cx.lineTo(len - 10, r * 0.2);
+  cx.stroke();
+  cx.fillStyle = '#b07a4a';
+  cx.beginPath(); cx.ellipse(len, 0, r * 0.45, r, 0, 0, Math.PI * 2); cx.fill();
+  cx.strokeStyle = '#6e4426'; cx.lineWidth = 1;
+  cx.beginPath(); cx.ellipse(len, 0, r * 0.25, r * 0.55, 0, 0, Math.PI * 2); cx.stroke();
+  if (glow) {
+    cx.globalCompositeOperation = 'lighter';
+    cx.strokeStyle = `rgba(255,${110 + Math.round(40 * glow)},40,${(0.35 + 0.3 * glow).toFixed(3)})`;
+    cx.lineWidth = 2.2;
+    cx.beginPath(); cx.moveTo(6, -r * 0.55); cx.lineTo(len - 4, -r * 0.62); cx.stroke();
+  }
+  cx.restore();
+}
+function drawGrate() {
+  cx.fillStyle = '#2a1810';
+  cx.beginPath(); cx.ellipse(170, 236, 122, 7, 0, 0, Math.PI * 2); cx.fill();
+  cx.fillStyle = '#17100c';
+  cx.fillRect(56, 226, 228, 7);
+  for (const x of [70, 270]) {
+    cx.fillRect(x - 4, 198, 8, 42);
+    cx.beginPath(); cx.arc(x, 196, 7, 0, Math.PI * 2); cx.fill();
+  }
+  cx.fillStyle = 'rgba(255,170,90,.25)';
+  cx.fillRect(56, 226, 228, 1.2);
+}
+function fire(dt, time) {
+  noise += (R() - 0.5) * dt * 3; noise *= 0.97;
+  noise = Math.max(-0.15, Math.min(0.15, noise));
+  const I = reduce ? 0.9 : 0.86 + 0.07 * Math.sin(time * 1.9) + 0.05 * Math.sin(time * 5.3 + 1.3) + noise;
+  stage.style.setProperty('--glow', (0.3 + 0.32 * I).toFixed(3));
 
-        // ============================================
-        // FUNCTIE: Update notities
-        // ============================================
-        function updateNotes(threadId, notes) {
-            const thread = threads.find(t => t.id === threadId);
-            if (thread) {
-                thread.notes = notes;
-                updateReflectiveSummary();
-                triggerAutoSave();
-            }
-        }
+  cx.globalCompositeOperation = 'source-over';
+  cx.globalAlpha = 1;
+  cx.clearRect(0, 0, FW, FH);
+  let g = cx.createRadialGradient(170, 200, 10, 170, 190, 200);
+  g.addColorStop(0, `rgba(255,130,50,${(0.34 * I).toFixed(3)})`); g.addColorStop(1, 'rgba(255,90,30,0)');
+  cx.fillStyle = g; cx.fillRect(0, 0, FW, FH);
 
-        // ============================================
-        // FUNCTIE: Kleur bepalen op basis van score
-        // ============================================
-        function getColorForScore(score) {
-            if (score >= 4) return '#2d8659'; // Groen
-            if (score === 3) return '#d68430'; // Oranje
-            return '#c94545'; // Rood
-        }
+  drawLog(60, 200, 280, 190, 13, 0);
 
-        // ============================================
-        // FUNCTIE: Helper voor tekst wrapping in SVG
-        // ============================================
-        function wrapVisionText(text, maxCharsPerLine) {
-            if (!text || text.trim().length === 0) return [];
-            
-            const words = text.trim().split(' ');
-            const lines = [];
-            let currentLine = '';
-            
-            for (let i = 0; i < words.length; i++) {
-                const testLine = currentLine + (currentLine ? ' ' : '') + words[i];
-                
-                if (testLine.length <= maxCharsPerLine) {
-                    currentLine = testLine;
-                } else {
-                    if (currentLine) {
-                        lines.push(currentLine);
-                        currentLine = words[i];
-                    } else {
-                        // Word is too long, break it
-                        lines.push(words[i].substring(0, maxCharsPerLine));
-                        currentLine = words[i].substring(maxCharsPerLine);
-                    }
-                }
-            }
-            
-            if (currentLine) {
-                lines.push(currentLine);
-            }
-            
-            // Limit to maximum 3 lines to fit in circle
-            return lines.slice(0, 3);
-        }
+  acc += dt * (reduce ? 90 : 190) * I;
+  while (acc >= 1) { acc -= 1; spawn(); }
+  cx.globalCompositeOperation = 'lighter';
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.life += dt;
+    const t = p.life / p.max;
+    if (t >= 1) { parts.splice(i, 1); continue; }
+    p.vy -= 34 * dt;
+    p.x += (p.vx + Math.sin(time * 3.1 + p.seed) * 16 * t + (170 - p.x) * 0.9 * t) * dt;
+    p.y += p.vy * dt;
+    const s = p.size * (1 - 0.7 * t);
+    cx.globalAlpha = (t < 0.12 ? t / 0.12 : 1) * (1 - t) * 0.85;
+    cx.drawImage(sprites[Math.min(23, Math.floor(t * 24))], p.x - s / 2, p.y - s / 2, s, s);
+  }
+  cx.globalAlpha = 1;
 
-        // ============================================
-        // FUNCTIE: Teken het spinnenweb (SVG)
-        // ============================================
-        function drawSpiderWeb() {
-            const svg = document.getElementById('spiderWebSVG');
-            const centerX = 300;
-            const centerY = 300;
-            const maxRadius = 220;
-            const levels = 5;
-            
-            // Clear SVG
-            svg.innerHTML = '';
-            
-            // Achtergrond cirkel
-            const bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            bgCircle.setAttribute('cx', centerX);
-            bgCircle.setAttribute('cy', centerY);
-            bgCircle.setAttribute('r', maxRadius + 20);
-            bgCircle.setAttribute('fill', '#f8f6f3');
-            svg.appendChild(bgCircle);
-            
-            // Teken concentrische cirkels (niveaus)
-            for (let i = 1; i <= levels; i++) {
-                const radius = (maxRadius / levels) * i;
-                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                circle.setAttribute('cx', centerX);
-                circle.setAttribute('cy', centerY);
-                circle.setAttribute('r', radius);
-                circle.setAttribute('fill', 'none');
-                circle.setAttribute('stroke', '#e0ddd8');
-                circle.setAttribute('stroke-width', i === levels ? '2' : '1');
-                circle.setAttribute('stroke-dasharray', i === levels ? 'none' : '5,5');
-                svg.appendChild(circle);
-                
-                // Label voor niveau
-                const levelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                levelText.setAttribute('x', centerX + radius - 15);
-                levelText.setAttribute('y', centerY - 5);
-                levelText.setAttribute('font-size', '11');
-                levelText.setAttribute('fill', '#999');
-                levelText.textContent = i;
-                svg.appendChild(levelText);
-            }
-            
-            // Bereken posities voor de 9 draden
-            const angleStep = (2 * Math.PI) / threads.length;
-            const startAngle = -Math.PI / 2; // Start bovenaan
-            
-            // Teken lijnen van centrum naar buitenste cirkel
-            threads.forEach((thread, index) => {
-                const angle = startAngle + (angleStep * index);
-                const endX = centerX + Math.cos(angle) * maxRadius;
-                const endY = centerY + Math.sin(angle) * maxRadius;
-                
-                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                line.setAttribute('x1', centerX);
-                line.setAttribute('y1', centerY);
-                line.setAttribute('x2', endX);
-                line.setAttribute('y2', endY);
-                line.setAttribute('stroke', '#d0ccc5');
-                line.setAttribute('stroke-width', '1');
-                svg.appendChild(line);
-            });
-            
-            // Teken de data polygon (verbind de scores)
-            const dataPoints = threads.map((thread, index) => {
-                const angle = startAngle + (angleStep * index);
-                const radius = (maxRadius / levels) * thread.score;
-                const x = centerX + Math.cos(angle) * radius;
-                const y = centerY + Math.sin(angle) * radius;
-                return `${x},${y}`;
-            });
-            
-            const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            polygon.setAttribute('points', dataPoints.join(' '));
-            polygon.setAttribute('fill', 'rgba(201, 169, 97, 0.2)');
-            polygon.setAttribute('stroke', 'rgba(201, 169, 97, 0.8)');
-            polygon.setAttribute('stroke-width', '3');
-            polygon.setAttribute('stroke-linejoin', 'round');
-            svg.appendChild(polygon);
-            
-            // Teken punten en labels voor elke draad
-            threads.forEach((thread, index) => {
-                const angle = startAngle + (angleStep * index);
-                const scoreRadius = (maxRadius / levels) * thread.score;
-                const pointX = centerX + Math.cos(angle) * scoreRadius;
-                const pointY = centerY + Math.sin(angle) * scoreRadius;
-                
-                // Score punt
-                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                circle.setAttribute('cx', pointX);
-                circle.setAttribute('cy', pointY);
-                circle.setAttribute('r', '8');
-                circle.setAttribute('fill', getColorForScore(thread.score));
-                circle.setAttribute('stroke', 'white');
-                circle.setAttribute('stroke-width', '2');
-                circle.setAttribute('class', 'data-point');
-                circle.setAttribute('data-thread', thread.id);
-                
-                // Tooltip event
-                circle.addEventListener('mouseenter', (e) => showTooltip(e, thread));
-                circle.addEventListener('mouseleave', hideTooltip);
-                
-                svg.appendChild(circle);
-                
-                // Label positie (buiten de cirkel)
-                const labelDistance = maxRadius + 40;
-                const labelX = centerX + Math.cos(angle) * labelDistance;
-                const labelY = centerY + Math.sin(angle) * labelDistance;
-                
-                // Label tekst
-                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                text.setAttribute('x', labelX);
-                text.setAttribute('y', labelY);
-                text.setAttribute('text-anchor', 'middle');
-                text.setAttribute('font-size', '13');
-                text.setAttribute('font-weight', '600');
-                text.setAttribute('fill', '#2d2d2d');
-                text.setAttribute('font-family', 'Crimson Pro, serif');
-                
-                // Multi-line tekst voor lange labels
-                const words = thread.title.split(' ');
-                if (words.length > 2) {
-                    const tspan1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-                    tspan1.setAttribute('x', labelX);
-                    tspan1.setAttribute('dy', '-0.6em');
-                    tspan1.textContent = words.slice(0, Math.ceil(words.length / 2)).join(' ');
-                    text.appendChild(tspan1);
-                    
-                    const tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-                    tspan2.setAttribute('x', labelX);
-                    tspan2.setAttribute('dy', '1.2em');
-                    tspan2.textContent = words.slice(Math.ceil(words.length / 2)).join(' ');
-                    text.appendChild(tspan2);
-                } else {
-                    text.textContent = thread.title;
-                }
-                
-                svg.appendChild(text);
-            });
-            
-            // Centrum cirkel voor Visie
-            const visionCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            visionCircle.setAttribute('cx', centerX);
-            visionCircle.setAttribute('cy', centerY);
-            visionCircle.setAttribute('r', '45');
-            visionCircle.setAttribute('fill', '#1e4d7b');
-            visionCircle.setAttribute('stroke', '#c9a961');
-            visionCircle.setAttribute('stroke-width', '3');
-            svg.appendChild(visionCircle);
-            
-            // Visie tekst
-            const visionLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            visionLabel.setAttribute('x', centerX);
-            visionLabel.setAttribute('y', centerY);
-            visionLabel.setAttribute('text-anchor', 'middle');
-            visionLabel.setAttribute('dominant-baseline', 'middle');
-            visionLabel.setAttribute('font-size', '16');
-            visionLabel.setAttribute('font-weight', 'bold');
-            visionLabel.setAttribute('fill', 'white');
-            visionLabel.setAttribute('font-family', 'Crimson Pro, serif');
-            visionLabel.textContent = 'VISIE';
-            svg.appendChild(visionLabel);
-        }
+  if (!reduce && R() < dt * 5 * I) sparks.push({ x: 150 + R() * 40, y: 190, vx: (R() - 0.5) * 30, vy: -(70 + R() * 90), life: 0, max: 0.9 + R() * 1.1 });
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const p = sparks[i];
+    p.life += dt;
+    if (p.life >= p.max || p.y < 0) { sparks.splice(i, 1); continue; }
+    p.vx += (R() - 0.5) * 160 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+    const a = 1 - p.life / p.max;
+    cx.fillStyle = `rgba(255,${180 + Math.round(60 * a)},120,${a.toFixed(3)})`;
+    cx.fillRect(p.x, p.y, 1.8, 1.8);
+  }
 
-        // ============================================
-        // FUNCTIE: Tooltip tonen
-        // ============================================
-        function showTooltip(event, thread) {
-            const tooltip = document.getElementById('tooltip');
-            tooltip.innerHTML = `
-                <strong>${thread.title}</strong><br>
-                Score: ${thread.score}/5<br>
-                ${thread.notes ? `<em>${thread.notes.substring(0, 100)}${thread.notes.length > 100 ? '...' : ''}</em>` : '<em>Geen toelichting</em>'}
-            `;
-            tooltip.classList.add('visible');
-            
-            // Position tooltip to prevent viewport overflow
-            const tooltipRect = tooltip.getBoundingClientRect();
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
-            
-            let left = event.pageX + 15;
-            let top = event.pageY + 15;
-            
-            // Adjust horizontal position if tooltip would overflow right edge
-            if (left + tooltipRect.width > viewportWidth) {
-                left = event.pageX - tooltipRect.width - 15;
-            }
-            
-            // Adjust vertical position if tooltip would overflow bottom edge
-            if (top + tooltipRect.height > viewportHeight) {
-                top = event.pageY - tooltipRect.height - 15;
-            }
-            
-            // Ensure tooltip doesn't go beyond left/top edges
-            left = Math.max(5, left);
-            top = Math.max(5, top);
-            
-            tooltip.style.left = left + 'px';
-            tooltip.style.top = top + 'px';
-        }
+  g = cx.createRadialGradient(170, 232, 4, 170, 232, 120);
+  g.addColorStop(0, `rgba(255,150,60,${(0.55 * I).toFixed(3)})`); g.addColorStop(1, 'rgba(255,80,20,0)');
+  cx.fillStyle = g; cx.fillRect(40, 190, 260, 50);
+  cx.globalCompositeOperation = 'source-over';
 
-        function hideTooltip() {
-            const tooltip = document.getElementById('tooltip');
-            tooltip.classList.remove('visible');
-        }
+  drawLog(78, 224, 232, 207, 13, I);
+  drawLog(118, 206, 272, 225, 12, I);
+  drawGrate();
+}
 
-        // ============================================
-        // FUNCTIE: Export als PNG
-        // ============================================
-        function exportAsPNG() {
-            // Hide elements with no-export class temporarily
-            const noExportElements = document.querySelectorAll('.no-export');
-            const originalDisplays = [];
-            
-            noExportElements.forEach(element => {
-                originalDisplays.push(element.style.display);
-                element.style.display = 'none';
-            });
-            
-            // Capture the visualization section using html2canvas
-            const visualizationSection = document.querySelector('.visualization-section');
-            
-            html2canvas(visualizationSection, {
-                backgroundColor: '#ffffff',
-                scale: 2, // Higher resolution
-                useCORS: true,
-                allowTaint: true
-            }).then(canvas => {
-                // Restore visibility of no-export elements
-                noExportElements.forEach((element, index) => {
-                    element.style.display = originalDisplays[index];
-                });
-                
-                // Convert canvas to blob and download
-                canvas.toBlob(function(blob) {
-                    const downloadUrl = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.download = 'spinnenweb.png';
-                    link.href = downloadUrl;
-                    link.click();
-                    URL.revokeObjectURL(downloadUrl);
-                });
-            }).catch(error => {
-                // Restore visibility on error
-                noExportElements.forEach((element, index) => {
-                    element.style.display = originalDisplays[index];
-                });
-                
-                console.error('Error exporting PNG:', error);
-                alert('Er is een fout opgetreden bij het exporteren van de PNG. Probeer het opnieuw.');
-            });
-        }
+/* klomp */
+const gifts = ['een chocoladeletter', 'een handje pepernoten', 'een marsepeinen varkentje', 'een speculaaspop', 'een taaitaaipop', 'een suikerbeest', 'een zakje chocolademunten', 'een chocolademuis'];
+const shoe = $('shoe'), bubble = $('bubble'), carrot = $('carrot'), gift = $('gift');
+let filled = false, lastGift = -1, bubT = null;
+shoe.addEventListener('click', () => {
+  filled = !filled;
+  carrot.style.display = filled ? 'none' : '';
+  gift.style.display = filled ? '' : 'none';
+  let msg;
+  if (filled) {
+    let i;
+    do { i = Math.floor(R() * gifts.length); } while (i === lastGift);
+    lastGift = i;
+    msg = `Het paard heeft de wortel opgegeten, en Sinterklaas liet ${gifts[i]} achter!`;
+  } else {
+    msg = 'Er zit weer een verse wortel in de klomp. Hij staat klaar voor vannacht.';
+  }
+  bubble.textContent = msg;
+  bubble.classList.add('show');
+  shoe.setAttribute('aria-label', filled ? 'Zet de klomp opnieuw met een wortel' : 'Kijk in de klomp');
+  clearTimeout(bubT);
+  bubT = setTimeout(() => bubble.classList.remove('show'), 5000);
+});
 
-        // ============================================
-        // FUNCTIE: Export als PDF
-        // ============================================
-        async function exportAsPDF() {
-            // Check if jsPDF is loaded
-            if (typeof window.jspdf === 'undefined') {
-                alert('PDF export is niet beschikbaar. Controleer je internetverbinding en probeer het opnieuw.');
-                return;
-            }
-            
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const pageHeight = pdf.internal.pageSize.getHeight();
-            const margin = 15;
-            let yPosition = margin;
-            
-            // Titel
-            pdf.setFontSize(20);
-            pdf.setTextColor(30, 77, 123); // Vision color
-            pdf.text('SLO Spinnenweb van Van den Akker', pageWidth / 2, yPosition, { align: 'center' });
-            yPosition += 10;
-            
-            // Datum
-            pdf.setFontSize(10);
-            pdf.setTextColor(102, 102, 102);
-            pdf.text(`Gegenereerd op: ${new Date().toLocaleDateString('nl-NL')}`, pageWidth / 2, yPosition, { align: 'center' });
-            yPosition += 15;
-            
-            // Visie sectie
-            pdf.setFontSize(14);
-            pdf.setTextColor(30, 77, 123);
-            pdf.text('Visie (Waartoe leren zij?)', margin, yPosition);
-            yPosition += 7;
-            
-            pdf.setFontSize(10);
-            pdf.setTextColor(45, 45, 45);
-            const visionText = document.getElementById('visionInput').value || 'Geen visie ingevuld';
-            const visionLines = pdf.splitTextToSize(visionText, pageWidth - 2 * margin);
-            pdf.text(visionLines, margin, yPosition);
-            yPosition += visionLines.length * 5 + 10;
-            
-            // Spinnenweb visualisatie
-            try {
-                const svg = document.getElementById('spiderWebSVG');
-                const svgData = new XMLSerializer().serializeToString(svg);
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                canvas.width = 1200;
-                canvas.height = 1200;
-                
-                const img = new Image();
-                const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(svgBlob);
-                
-                await new Promise((resolve, reject) => {
-                    img.onload = () => {
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(img, 0, 0, 1200, 1200);
-                        URL.revokeObjectURL(url);
-                        resolve();
-                    };
-                    img.onerror = reject;
-                    img.src = url;
-                });
-                
-                const imgData = canvas.toDataURL('image/png');
-                const imgWidth = pageWidth - 2 * margin;
-                const imgHeight = imgWidth; // Square
-                
-                // Check if we need a new page
-                if (yPosition + imgHeight > pageHeight - margin) {
-                    pdf.addPage();
-                    yPosition = margin;
-                }
-                
-                pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
-                yPosition += imgHeight + 10;
-                
-            } catch (error) {
-                console.error('Error adding spider web to PDF:', error);
-            }
-            
-            // Nieuwe pagina voor componenten
-            pdf.addPage();
-            yPosition = margin;
-            
-            // Componenten details
-            pdf.setFontSize(14);
-            pdf.setTextColor(30, 77, 123);
-            pdf.text('Curriculumcomponenten - Detailoverzicht', margin, yPosition);
-            yPosition += 10;
-            
-            threads.forEach((thread, index) => {
-                // Check if we need a new page
-                if (yPosition > pageHeight - 40) {
-                    pdf.addPage();
-                    yPosition = margin;
-                }
-                
-                // Thread titel
-                pdf.setFontSize(12);
-                pdf.setTextColor(45, 45, 45);
-                pdf.text(`${index + 1}. ${thread.title}`, margin, yPosition);
-                yPosition += 6;
-                
-                // Vraag
-                pdf.setFontSize(9);
-                pdf.setTextColor(102, 102, 102);
-                pdf.setFont(undefined, 'italic');
-                pdf.text(thread.question, margin + 5, yPosition);
-                yPosition += 5;
-                pdf.setFont(undefined, 'normal');
-                
-                // Score met kleur
-                const scoreColor = thread.score >= 4 ? [45, 134, 89] : (thread.score === 3 ? [214, 132, 48] : [201, 69, 69]);
-                pdf.setTextColor(...scoreColor);
-                pdf.text(`Score: ${thread.score}/5`, margin + 5, yPosition);
-                yPosition += 6;
-                
-                // Notities
-                if (thread.notes) {
-                    pdf.setFontSize(9);
-                    pdf.setTextColor(45, 45, 45);
-                    const notesLines = pdf.splitTextToSize(thread.notes, pageWidth - 2 * margin - 10);
-                    pdf.text(notesLines, margin + 5, yPosition);
-                    yPosition += notesLines.length * 4 + 3;
-                } else {
-                    pdf.setFontSize(9);
-                    pdf.setTextColor(150, 150, 150);
-                    pdf.text('Geen toelichting', margin + 5, yPosition);
-                    yPosition += 5;
-                }
-                
-                yPosition += 5; // Extra ruimte tussen items
-            });
-            
-            // Save PDF
-            pdf.save('spinnenweb-rapport.pdf');
-        }
-
-        // ============================================
-        // FUNCTIE: Export als JSON
-        // ============================================
-        function exportAsJSON() {
-            const data = {
-                vision: document.getElementById('visionInput').value,
-                threads: threads,
-                exportDate: new Date().toISOString()
-            };
-            
-            const jsonString = JSON.stringify(data, null, 2);
-            const blob = new Blob([jsonString], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            
-            const link = document.createElement('a');
-            link.download = 'slo-spinnenweb-data.json';
-            link.href = url;
-            link.click();
-            
-            URL.revokeObjectURL(url);
-        }
-
-        // ============================================
-        // FUNCTIE: Laden vanuit JSON
-        // ============================================
-        function loadFromJSON() {
-            document.getElementById('jsonFileInput').click();
-        }
-
-        document.getElementById('jsonFileInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    
-                    // Update vision
-                    if (data.vision) {
-                        document.getElementById('visionInput').value = data.vision;
-                        visionText = data.vision;
-                    }
-                    
-                    // Update threads
-                    if (data.threads && Array.isArray(data.threads)) {
-                        data.threads.forEach(loadedThread => {
-                            const thread = threads.find(t => t.id === loadedThread.id);
-                            if (thread) {
-                                thread.score = loadedThread.score;
-                                thread.notes = loadedThread.notes;
-                            }
-                        });
-                    }
-                    
-                    // Regenerate UI
-                    document.getElementById('threadsContainer').innerHTML = '';
-                    generateThreadInputs();
-                    drawSpiderWeb();
-                    updateReflectiveSummary();
-                    updateVisionSection();
-                    
-                    alert('Data succesvol geladen!');
-                } catch (error) {
-                    alert('Fout bij het laden van het JSON-bestand: ' + error.message);
-                }
-            };
-            reader.readAsText(file);
-            
-            // Reset file input
-            e.target.value = '';
-        });
-
-        // ============================================
-        // FUNCTIE: Update vision text
-        // ============================================
-        document.getElementById('visionInput').addEventListener('input', function(e) {
-            visionText = e.target.value;
-            updateVisionSection();
-            triggerAutoSave();
-        });
-
-        // ============================================
-        // INITIALISATIE
-        // ============================================
-        window.addEventListener('DOMContentLoaded', function() {
-            // Probeer eerst data te laden uit localStorage
-            const hasLocalData = loadFromLocalStorage();
-            
-            // Genereer UI
-            generateThreadInputs();
-            drawSpiderWeb();
-            updateReflectiveSummary();
-            updateVisionSection();
-            
-            // Toon notificatie als er data geladen is
-            if (hasLocalData) {
-                const indicator = document.getElementById('autoSaveIndicator');
-                indicator.textContent = 'Eerdere sessie hersteld';
-                indicator.classList.add('visible');
-                setTimeout(() => {
-                    indicator.classList.remove('visible');
-                    indicator.textContent = 'Automatisch opgeslagen';
-                }, 3000);
-            }
-        });
-    </script>
+/* animatielus */
+let lastT = performance.now();
+function frame(t) {
+  const dt = Math.min(0.05, Math.max(0, (t - lastT) / 1000));
+  lastT = t;
+  updClock(new Date());
+  fire(dt, t / 1000);
+  requestAnimationFrame(frame);
+}
+updClock(new Date());
+requestAnimationFrame(frame);
+}
+</script>
 </body>
 </html>
