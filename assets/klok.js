@@ -146,7 +146,6 @@ function buildPage(T, auto, base) {
   const app = document.createElement('main');
   app.className = 'app'; app.id = 'app';
   app.innerHTML = `
-<a class="back" href="${base || './'}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Alle klokken</a>
 <header class="top"><h1>${T.name}</h1><p id="tagline">${T.tagline}</p></header>
 <div class="stage" id="stage">
   <svg ${vb}><defs>${S.defsMarkup()}</defs>${back}</svg>
@@ -175,6 +174,10 @@ function buildPage(T, auto, base) {
   <footer><span id="eggs" class="eggs" hidden></span>${auto ? '<span class="autonote">Automatische klok: wisselt vanzelf mee met het seizoen.</span>' : ''}</footer>
 </div>`;
   document.body.insertBefore(app, document.body.firstChild);
+  const backBtn = document.createElement('a');
+  backBtn.className = 'back'; backBtn.href = base || './';
+  backBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Alle klokken';
+  document.body.insertBefore(backBtn, document.body.firstChild);
   const rain = document.createElement('canvas');
   rain.id = 'rain'; rain.setAttribute('aria-hidden', 'true');
   document.body.appendChild(rain);

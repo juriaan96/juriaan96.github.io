@@ -10,11 +10,10 @@ LAYOUT: liggend: kamer links, klok en aftellen rechts, alles meeschalend; staand
 html{-webkit-text-size-adjust:100%}
 body{margin:0;min-height:100vh;background:radial-gradient(ellipse 90% 70% at 50% 35%,var(--bg2) 0%,var(--bg) 70%) no-repeat,var(--bg);background-color:var(--bg);color:var(--ink);font:16px/1.55 "Nunito Sans",system-ui,-apple-system,"Segoe UI",sans-serif;overflow-x:hidden}
 a{color:var(--accent)}
-.back{display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:12px 0 0 12px;padding:0 16px 0 10px;border-radius:999px;border:1px solid var(--line);background:rgba(0,0,0,.25);color:var(--ink);font:600 15px/1 "Nunito Sans",system-ui,sans-serif;text-decoration:none}
+.back{position:absolute;left:14px;top:14px;z-index:30;display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:0;padding:0 16px 0 10px;border-radius:999px;border:1px solid var(--line);background:rgba(0,0,0,.25);color:var(--ink);font:600 15px/1 "Nunito Sans",system-ui,sans-serif;text-decoration:none}
 .back svg{flex:none;margin-right:6px}
 .back:hover{background:rgba(255,255,255,.1)}
 .back:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
-html.fit .back{position:absolute;left:24px;top:22px;margin:0;z-index:5;font-size:17px;min-height:48px}
 footer .autonote{display:block;font-size:13px}
 .top{text-align:center;padding:24px 16px 0;padding:clamp(18px,3vw,32px) max(5vw,16px) 0}
 h1{margin:0;font:600 44px/1.05 Fraunces,Georgia,serif;font:600 clamp(32px,5vw,50px)/1.05 Fraunces,Georgia,serif;color:var(--accent);text-wrap:balance}
@@ -141,3 +140,4 @@ html.fit .bubble{font-size:17px}
 .meta p{margin:4px 0 0;color:var(--muted);font-size:15px}
 .badge{display:inline-block;margin-top:8px;padding:3px 10px;border-radius:999px;background:var(--accent2);color:var(--btnInk);font-size:13px;font-weight:600}
 .overview footer{margin-top:28px}
+@media(max-width:640px){html:not(.fit) .top{padding-top:70px}}
