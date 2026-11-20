@@ -79,6 +79,14 @@ h1{margin:0;font:600 44px/1.05 Fraunces,Georgia,serif;font:600 clamp(32px,5vw,50
 .count{margin:0;font:600 24px/1.2 Fraunces,Georgia,serif;font:600 clamp(20px,2.4vw,26px)/1.2 Fraunces,Georgia,serif;color:var(--goldl);text-wrap:balance}
 .sub{margin:6px 0 0;color:var(--muted)}
 .sound{min-height:44px;padding:0 20px;border-radius:999px;border:1px solid rgba(243,210,122,.55);background:rgba(243,210,122,.08);color:var(--ink);font:600 16px/1 "Nunito Sans",system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.controls{display:flex;flex-direction:column;align-items:center}
+.ctl-row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center}
+.ctl-row+.ctl-row{margin-top:10px}
+.ctl-row>*{margin:4px 5px}
+.lbl{color:var(--muted);font-size:15px}
+.sel{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid rgba(243,210,122,.55);background:#2a1114;color:var(--ink);font:600 16px/1.2 "Nunito Sans",system-ui,sans-serif;cursor:pointer;max-width:100%}
+.sel:focus-visible{outline:3px solid var(--goldl);outline-offset:3px}
+.radio-stat{margin:8px 0 0;min-height:1.4em;color:var(--muted);font-size:14px;text-align:center;max-width:34ch}
 .sound:hover{background:rgba(243,210,122,.16)}
 .sound:focus-visible{outline:3px solid var(--goldl);outline-offset:3px}
 .sound.on{background:var(--gold);color:#2a1208;border-color:var(--gold)}
@@ -100,12 +108,12 @@ html.fit,html.fit body{height:100%;overflow:hidden}
 html.fit body{min-height:0}
 html.fit .app{position:absolute;left:50%;top:50%;width:1600px;height:1000px;margin:-500px 0 0 -800px;padding:24px 44px 24px 12px;display:grid;grid-template-columns:1058px 1fr;grid-template-rows:auto 1fr;column-gap:40px;-webkit-transform-origin:50% 50%;transform-origin:50% 50%}
 html.fit .stage{grid-column:1;grid-row:1/3;width:1058px;max-width:none;margin:0;align-self:center}
-html.fit .top{grid-column:2;grid-row:1;padding:34px 0 0}
+html.fit .top{grid-column:2;grid-row:1;padding:26px 0 0}
 html.fit h1{font-size:58px}
 html.fit .top p{font-size:19px}
 html.fit .side{grid-column:2;grid-row:2;display:flex;flex-direction:column;justify-content:center;min-height:0}
 html.fit .panel{grid-template-columns:minmax(0,1fr);justify-items:center;text-align:center;padding:0;gap:16px;max-width:none}
-html.fit .time{font-size:100px}
+html.fit .time{font-size:92px}
 html.fit .date{font-size:19px}
 html.fit .count{font-size:29px}
 html.fit .sub{font-size:17px}
@@ -113,7 +121,8 @@ html.fit .xmas{grid-template-columns:minmax(0,1fr);justify-items:center;text-ali
 html.fit .xmas h2{font-size:27px}
 html.fit .xm-n{font-size:54px}
 html.fit .xm-l{font-size:15px}
-html.fit .hint{font-size:15px;margin-top:22px;padding:0}
+html.fit .hint{font-size:15px;margin-top:18px;padding:0}
+html.fit .radio-stat{max-width:none}
 html.fit footer{padding:12px 0 0}
 html.fit .bubble{font-size:17px}
 .flame{transform-box:fill-box;transform-origin:50% 100%;animation:flick 1.3s ease-in-out infinite alternate}
@@ -351,7 +360,17 @@ html.fit .bubble{font-size:17px}
     <p class="count" id="count"></p>
     <p class="sub" id="count2"></p>
   </div>
-  <button class="sound" id="sound" type="button">Haardgeluid aanzetten</button>
+  <div class="controls">
+    <div class="ctl-row">
+      <button class="sound" id="sound" type="button">Haardgeluid: uit</button>
+      <button class="sound" id="radio" type="button">Radio: uit</button>
+    </div>
+    <div class="ctl-row">
+      <label class="lbl" for="radioSel">Zender</label>
+      <select class="sel" id="radioSel"></select>
+    </div>
+    <p class="radio-stat" id="radioStat" role="status" aria-live="polite"></p>
+  </div>
 </section>
 <section class="xmas" aria-label="Aftellen tot de kerstvakantie">
   <div>
@@ -366,7 +385,7 @@ html.fit .bubble{font-size:17px}
     <div><span class="xm-n" id="xmS">00</span><span class="xm-l">seconden</span></div>
   </div>
 </section>
-<p class="hint">Klik op de klomp om te kijken of Sinterklaas al langs is geweest. En kijk ook eens goed rond in de kamer: er is meer verstopt.</p>
+<p class="hint">Klik op de klomp of Sint al is geweest. En kijk goed rond: er is meer verstopt.</p>
 <footer>Fijne Sinterklaastijd!<p class="eggs" id="eggs" hidden></p></footer>
 </div>
 </main>
@@ -524,7 +543,7 @@ btn.addEventListener('click', () => {
   try {
     if (!ac) initAudio();
     soundOn = !soundOn;
-    btn.textContent = soundOn ? 'Haardgeluid uitzetten' : 'Haardgeluid aanzetten';
+    btn.textContent = soundOn ? 'Haardgeluid: aan' : 'Haardgeluid: uit';
     btn.classList.toggle('on', soundOn);
     clearTimeout(crackT);
     master.gain.cancelScheduledValues(ac.currentTime);
@@ -542,6 +561,79 @@ btn.addEventListener('click', () => {
     btn.textContent = 'Geluid niet beschikbaar';
   }
 });
+
+/* Sinterklaasradio: live internetradio met automatische terugval */
+const STATIONS = [
+  { name: 'SinterklaasRadio', urls: ['https://stream06.dotpoint.nl:8004/stream', 'https://stream02.dotpoint.nl:8000/radio.mp3'] },
+  { name: 'Sint FM', urls: ['https://stream.tbmp.nl:8000/sinterklaasradiohigh.mp3'] }
+];
+const radioBtn = $('radio'), radioSel = $('radioSel'), radioStat = $('radioStat');
+radioSel.innerHTML = STATIONS.map((st, i) => `<option value="${i}">${st.name}</option>`).join('');
+let audio = null, radioOn = false, queue = [], qi = 0, attempt = 0, connectT = null;
+function radioIdle() {
+  radioStat.textContent = inSeason(new Date()) ? 'Live Sinterklaasliedjes via internetradio.' : 'Let op: de Sinterklaaszenders draaien meestal alleen tot en met 5 december.';
+}
+function radioUI() {
+  radioBtn.textContent = radioOn ? 'Radio: aan' : 'Radio: uit';
+  radioBtn.classList.toggle('on', radioOn);
+}
+function radioFail(a) { if (a === attempt && radioOn) tryNextStream(); }
+function tryNextStream() {
+  clearTimeout(connectT);
+  if (!radioOn) return;
+  if (qi >= queue.length) {
+    stopRadio();
+    radioStat.textContent = 'Geen zender bereikbaar. Mogelijk blokkeert het netwerk de stream, of de zender is uit de lucht.';
+    return;
+  }
+  const item = queue[qi++], my = ++attempt;
+  audio.dataset.st = item.i;
+  radioStat.textContent = `Verbinden met ${STATIONS[item.i].name}...`;
+  audio.src = item.u;
+  let p;
+  try { p = audio.play(); } catch (e) { radioFail(my); return; }
+  if (p && p.catch) p.catch(err => {
+    if (my !== attempt) return;
+    if (err && err.name === 'NotAllowedError') { stopRadio(); radioStat.textContent = 'De browser hield het geluid tegen. Klik nog een keer op Radio.'; }
+    else if (!err || err.name !== 'AbortError') radioFail(my);
+  });
+  connectT = setTimeout(() => radioFail(my), 9000);
+}
+function startRadio() {
+  if (!audio) {
+    audio = document.createElement('audio');
+    audio.preload = 'none';
+    audio.hidden = true;
+    document.body.appendChild(audio);
+    audio.addEventListener('playing', () => {
+      clearTimeout(connectT);
+      if (radioOn) radioStat.textContent = `Speelt nu: ${STATIONS[+audio.dataset.st].name}`;
+    });
+    audio.addEventListener('error', () => radioFail(attempt));
+  }
+  const start = +radioSel.value || 0;
+  queue = [];
+  [start].concat(STATIONS.map((_, i) => i).filter(i => i !== start)).forEach(i => STATIONS[i].urls.forEach(u => queue.push({ i: i, u: u })));
+  qi = 0;
+  radioOn = true;
+  radioUI();
+  tryNextStream();
+}
+function stopRadio() {
+  radioOn = false;
+  attempt++;
+  clearTimeout(connectT);
+  if (audio) {
+    audio.pause();
+    audio.removeAttribute('src');
+    try { audio.load(); } catch (e) {}
+  }
+  radioUI();
+  radioIdle();
+}
+radioBtn.addEventListener('click', () => { if (radioOn) stopRadio(); else startRadio(); });
+radioSel.addEventListener('change', () => { if (radioOn) startRadio(); });
+radioIdle();
 
 /* klok, datum en aftellen */
 const hh = $('hh'), mh = $('mh'), sh = $('sh'), pend = $('pend');
