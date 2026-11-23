@@ -16,7 +16,8 @@ const SWIPE_MIN_PX = 20;
  * Het toetsenbord wordt doorgegeven door main.js (handleKey), zodat menu's en spel elkaars
  * toetsen niet afvangen. Swipes tellen alleen als isEnabled() true is.
  *
- * handlers: { onMove(dx, dy), onPause(), onWhere() }
+ * handlers: { onMove(dx, dy), onPause(), onWhere(), onTap(clientX, clientY, pointerType) }
+ * Een korte aanraking zonder beweging is een tik (onTap); een veeg is een swipe (onMove).
  */
 export class Input {
   constructor(swipeTarget, handlers, isEnabled) {
@@ -40,7 +41,7 @@ export class Input {
   /** Geeft true terug als de toets door het spel is gebruikt. */
   handleKey(e) {
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
-    const dir = KEY_DIRS[e.code] ?? KEY_DIRS[e.key];
+    const dir = KEY_DIRS[e.code] || KEY_DIRS[e.key];
     if (dir) {
       e.preventDefault();
       // Ingedrukt houden laat de speler niet doorlopen: één stap per aanslag.
@@ -55,7 +56,7 @@ export class Input {
     if (e.code === 'Space') {
       // "Waar sta ik?": positiegeluid (vooral handig in noncha mode)
       e.preventDefault();
-      if (!e.repeat) this.handlers.onWhere?.();
+      if (!e.repeat && this.handlers.onWhere) this.handlers.onWhere();
       return true;
     }
     return false;
@@ -63,6 +64,7 @@ export class Input {
 
   onPointerDown(e) {
     if (!e.isPrimary || !this.isEnabled()) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     this.pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
   }
 
@@ -72,7 +74,10 @@ export class Input {
     if (!start || start.id !== e.pointerId || !this.isEnabled()) return;
     const dx = e.clientX - start.x;
     const dy = e.clientY - start.y;
-    if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_MIN_PX) return;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_MIN_PX) {
+      if (this.handlers.onTap) this.handlers.onTap(e.clientX, e.clientY, e.pointerType);
+      return;
+    }
     if (Math.abs(dx) > Math.abs(dy)) this.handlers.onMove(Math.sign(dx), 0);
     else this.handlers.onMove(0, Math.sign(dy));
   }

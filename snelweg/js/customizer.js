@@ -50,7 +50,9 @@ function radio(label, value) {
   return btn;
 }
 
-export const displayName = (profile) => profile?.name?.trim() || 'Speler';
+const focusEl = (el) => el && el.focus();
+
+export const displayName = (profile) => (profile && profile.name && profile.name.trim()) || 'Speler';
 
 export class Customizer {
   /**
@@ -135,7 +137,7 @@ export class Customizer {
     cameraBtn.hidden = !(typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
     for (const input of [fileInput, cameraInput]) {
       input.addEventListener('change', () => {
-        const file = input.files?.[0];
+        const file = input.files && input.files[0];
         input.value = ''; // zelfde bestand later opnieuw kunnen kiezen
         if (file) this.handlers.onPickPhoto(file);
       });
@@ -269,7 +271,7 @@ export class Customizer {
       this.setStatus(err instanceof StorageError ? err.message : 'Verwijderen is niet gelukt.', 'error');
     }
     this.update();
-    this.profileGroup.querySelector('[aria-checked="true"]')?.focus();
+    focusEl(this.profileGroup.querySelector('[aria-checked="true"]'));
   }
 
   resetDelete() {
@@ -283,7 +285,7 @@ export class Customizer {
 
   renderProfiles() {
     const group = this.profileGroup;
-    group.replaceChildren();
+    group.textContent = '';
     for (const p of this.profiles.list) {
       const btn = radio(displayName(p), p.id);
       btn.className = 'cz-profile';
@@ -291,7 +293,7 @@ export class Customizer {
       btn.setAttribute('aria-checked', String(checked));
       btn.tabIndex = checked ? 0 : -1;
       const canvas = makeCanvas(40);
-      paintAvatar(canvas, p.look, p.faceSmall ?? p.face);
+      paintAvatar(canvas, p.look, p.faceSmall || p.face);
       const name = document.createElement('span');
       name.textContent = displayName(p);
       name.setAttribute('aria-hidden', 'true');
@@ -306,7 +308,7 @@ export class Customizer {
     const look = profile.look;
     const hadFocus = this.profileGroup.contains(document.activeElement);
     this.renderProfiles();
-    if (hadFocus) this.profileGroup.querySelector('[aria-checked="true"]')?.focus();
+    if (hadFocus) focusEl(this.profileGroup.querySelector('[aria-checked="true"]'));
 
     if (document.activeElement !== this.nameInput) this.nameInput.value = profile.name;
     for (const [key, group] of Object.entries(this.groups)) {

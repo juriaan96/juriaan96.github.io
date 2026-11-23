@@ -41,7 +41,7 @@ export class AudioEngine {
       if (!AC) return;
       try {
         this.ctx = new AC();
-      } catch {
+      } catch (e) {
         return;
       }
       this.build();
@@ -189,8 +189,10 @@ export class AudioEngine {
     voice.gain.gain.setValueAtTime(0.0001, now);
     voice.gain.gain.exponentialRampToValueAtTime(0.9, now + dur / 2);
     voice.gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-    voice.pan?.pan.setValueAtTime(-1, now);
-    voice.pan?.pan.linearRampToValueAtTime(1, now + dur);
+    if (voice.pan) {
+      voice.pan.pan.setValueAtTime(-1, now);
+      voice.pan.pan.linearRampToValueAtTime(1, now + dur);
+    }
     const f = voice.osc.frequency.value;
     voice.osc.frequency.setValueAtTime(f * 1.25, now);
     voice.osc.frequency.linearRampToValueAtTime(f * 0.8, now + dur);
@@ -241,7 +243,7 @@ export class AudioEngine {
 
   createVoice(v, bus = this.engines) {
     const ctx = this.ctx;
-    const spec = ENGINES[v.type] ?? ENGINES.car;
+    const spec = ENGINES[v.type] || ENGINES.car;
     const now = ctx.currentTime;
     // Kleine variatie per voertuig zodat ze niet allemaal gelijk klinken
     const detune = 0.9 + Math.random() * 0.2;
@@ -330,7 +332,7 @@ export class AudioEngine {
     for (const s of voice.sources) {
       try {
         s.stop(now + 0.4);
-      } catch {
+      } catch (e) {
         // al gestopt
       }
     }

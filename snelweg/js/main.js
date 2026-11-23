@@ -1,4 +1,4 @@
-import { START_LIVES } from './config.js';
+import { START_LIVES, COLS, ROWS } from './config.js';
 import { Game } from './game.js';
 import { Renderer } from './render.js';
 import { Input } from './input.js';
@@ -78,7 +78,7 @@ function vibrate(pattern) {
   if (settings.vibrate && typeof navigator.vibrate === 'function') {
     try {
       navigator.vibrate(pattern);
-    } catch {
+    } catch (e) {
       // niet ondersteund
     }
   }
@@ -106,7 +106,7 @@ function onGameEvent(type, data = {}) {
     case 'hit': {
       const left = game.lives;
       announce(
-        `Geraakt door ${VEHICLE_NAMES[data.vehicle?.type] ?? 'een voertuig'}! ` +
+        `Geraakt door ${(data.vehicle && VEHICLE_NAMES[data.vehicle.type]) || 'een voertuig'}! ` +
           (left > 0 ? `Nog ${left} ${left === 1 ? 'leven' : 'levens'}.` : 'Geen levens meer.'),
       );
       vibrate([120, 60, 160]);
@@ -187,13 +187,13 @@ function focusables(root) {
 }
 
 function focusFirst(root) {
-  const el = root.querySelector('[data-autofocus]:not([hidden])') ?? focusables(root)[0];
-  el?.focus();
+  const el = root.querySelector('[data-autofocus]:not([hidden])') || focusables(root)[0];
+  if (el) el.focus();
 }
 
 function startGame(mode = 'normal') {
   game.player.look = { ...profile.look };
-  game.player.face = profile.face ?? null;
+  game.player.face = profile.face || null;
   game.newGame(mode);
   show('game');
 }
@@ -209,7 +209,8 @@ function renderWho() {
   const who = $('menu-who');
   const name = document.createElement('strong');
   name.textContent = displayName(profile);
-  who.replaceChildren(createAvatar(profile.look, 32, profile.faceSmall ?? profile.face), 'Je speelt als ', name);
+  who.textContent = '';
+  who.append(createAvatar(profile.look, 32, profile.faceSmall || profile.face), 'Je speelt als ', name);
 }
 
 // --- Gezicht uitsnijden ----------------------------------------------------------
@@ -222,7 +223,7 @@ async function openFaceEditor(file) {
     show('face', { focus: false });
     faceEditor.open(source);
     $('face-canvas').focus();
-  } catch {
+  } catch (e) {
     customizer.setStatus('Deze foto kan niet worden geopend. Kies een andere afbeelding.', 'error');
   }
 }
@@ -250,7 +251,7 @@ function resumeGame() {
 const actions = {
   play: () => startGame('normal'),
   'play-again': () => startGame(game.mode),
-  highscores: () => openHighscores(current === 'gameover' ? lastResult?.mode : 'normal'),
+  highscores: () => openHighscores(current === 'gameover' && lastResult ? lastResult.mode : 'normal'),
   settings: () => openSettings(),
   customize: () => {
     customizer.open();
@@ -275,7 +276,7 @@ document.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action], [data-cz], [role="radio"], [role="tab"]');
   if (!btn || btn.disabled) return;
   audio.play('ui');
-  if (btn.dataset.action) actions[btn.dataset.action]?.();
+  if (btn.dataset.action && actions[btn.dataset.action]) actions[btn.dataset.action]();
 });
 
 hud.pause.addEventListener('click', pauseGame);
@@ -290,14 +291,77 @@ hud.pause.addEventListener('pointerdown', (e) => {
 
 const app = $('app');
 const touchControls = $('touch-controls');
+const touchControlsLeft = $('touch-controls-left');
+// ?smartboard in de URL zet de smartboard-modus aan (handig als bladwijzer in de klas).
+const forceSmartboard = new URLSearchParams(location.search).has('smartboard');
 
 /** De ruimte voor de knoppen blijft gereserveerd zolang de instelling aan staat (geen verspringend veld). */
 function updateTouchControls() {
+  const smartboard = settings.smartboard || forceSmartboard;
+  document.documentElement.classList.toggle('smartboard', smartboard);
   app.classList.toggle('show-touch', settings.touchButtons);
-  touchControls.hidden = !(settings.touchButtons && current === 'game');
+  const visible = settings.touchButtons && current === 'game';
+  touchControls.hidden = !visible;
+  touchControlsLeft.hidden = !(visible && smartboard);
+  if (!window.ResizeObserver) fit(); // zonder ResizeObserver zelf opnieuw meten
 }
 
-for (const btn of touchControls.querySelectorAll('[data-dir]')) {
+/**
+ * Eerste aanraking van een touchscreen: pijlknoppen aan, en op een groot scherm de
+ * smartboard-modus. Alleen zolang de speler die instellingen niet zelf heeft gekozen.
+ */
+window.addEventListener(
+  'pointerdown',
+  (e) => {
+    if (e.pointerType !== 'touch') return;
+    let changed = false;
+    if (settings.touchAuto && !settings.touchButtons) {
+      settings.touchButtons = true;
+      changed = true;
+    }
+    if (settings.smartboardAuto && !settings.smartboard && Math.min(screen.width, innerWidth) >= 1700) {
+      settings.smartboard = true;
+      changed = true;
+    }
+    if (changed) {
+      updateTouchControls();
+      trySaveSettings();
+    }
+  },
+  { capture: true },
+);
+
+/**
+ * Tik-om-te-lopen. Normaal: één stap in de richting van de tik, gezien vanaf het poppetje.
+ * Noncha (poppetje onzichtbaar): vaste vlakken; bovenste derde = vooruit, onderste derde =
+ * terug, middenband links/rechts = opzij.
+ */
+function onTap(clientX, clientY, pointerType) {
+  if (!settings.tapToWalk || !game.active || game.state !== 'playing') return;
+  // Muisklikken alleen in de smartboard-modus (sommige digiborden geven aanraking door als muis).
+  if (pointerType === 'mouse' && !(settings.smartboard || forceSmartboard)) return;
+  const r = canvas.getBoundingClientRect();
+  const gx = ((clientX - r.left) / r.width) * COLS;
+  const gy = ((clientY - r.top) / r.height) * ROWS;
+  let dx;
+  let dy;
+  if (game.mode === 'noncha') {
+    if (gy < ROWS / 3) [dx, dy] = [0, -1];
+    else if (gy > (ROWS * 2) / 3) [dx, dy] = [0, 1];
+    else [dx, dy] = [gx < COLS / 2 ? -1 : 1, 0];
+  } else {
+    const px = game.player.col + 0.5;
+    const py = game.player.row + 0.5;
+    const ox = gx - px;
+    const oy = gy - py;
+    if (Math.abs(ox) < 0.5 && Math.abs(oy) < 0.5) return; // op het poppetje zelf getikt
+    [dx, dy] = Math.abs(ox) > Math.abs(oy) ? [Math.sign(ox), 0] : [0, Math.sign(oy)];
+    renderer.markTap(gx, gy);
+  }
+  game.handleMove(dx, dy);
+}
+
+for (const btn of document.querySelectorAll('.touch-controls [data-dir]')) {
   const [dx, dy] = btn.dataset.dir.split(',').map(Number);
   btn.addEventListener('pointerdown', (e) => {
     e.preventDefault(); // geen focus, geen zoom, direct reageren
@@ -319,6 +383,7 @@ const input = new Input(
     onMove: (dx, dy) => game.handleMove(dx, dy),
     onPause: pauseGame,
     onWhere: where,
+    onTap,
   },
   () => current === 'game',
 );
@@ -349,7 +414,7 @@ function handleMenuKey(e) {
   }
 
   // Tabs en radiogroepen: links/rechts wisselt (en kiest) binnen de groep.
-  const role = active?.getAttribute('role');
+  const role = active && active.getAttribute('role');
   if ((role === 'tab' || role === 'radio') && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
     e.preventDefault();
     const group = active.closest('[role="tablist"], [role="radiogroup"]');
@@ -393,7 +458,7 @@ function showGameOver(result) {
   const canSave = qualifies(result.mode, result.score);
   goForm.hidden = !canSave;
   goName.maxLength = NAME_MAX_LENGTH;
-  goName.value = profile.name?.trim() || settings.lastName;
+  goName.value = (profile.name && profile.name.trim()) || settings.lastName;
   setStatus(goStatus, canSave ? '' : 'Geen highscore deze keer.');
   backTarget = 'gameover';
   show('gameover', { focus: false });
@@ -456,7 +521,7 @@ screens.highscores.querySelector('.tabs').addEventListener('click', (e) => {
 
 function renderHighscores(mode) {
   const list = loadHighscores()[mode];
-  hsList.replaceChildren();
+  hsList.textContent = '';
   hsEmpty.hidden = list.length > 0;
   list.forEach((entry, i) => {
     const li = document.createElement('li');
@@ -495,16 +560,23 @@ function openSettings() {
   f.volume.value = Math.round(settings.volume * 100);
   f.vibrate.checked = settings.vibrate;
   f.touchButtons.checked = settings.touchButtons;
+  f.tapToWalk.checked = settings.tapToWalk;
+  f.smartboard.checked = settings.smartboard || forceSmartboard;
   setStatus(settingsStatus, '');
   show('settings');
 }
 
-settingsForm.addEventListener('input', () => {
+settingsForm.addEventListener('input', (e) => {
   const f = settingsForm.elements;
   settings.sound = f.sound.checked;
   settings.volume = Number(f.volume.value) / 100;
   settings.vibrate = f.vibrate.checked;
   settings.touchButtons = f.touchButtons.checked;
+  settings.tapToWalk = f.tapToWalk.checked;
+  settings.smartboard = f.smartboard.checked;
+  // Zelf gekozen: niet meer automatisch aanpassen bij aanraking.
+  if (e.target.name === 'touchButtons') settings.touchAuto = false;
+  if (e.target.name === 'smartboard') settings.smartboardAuto = false;
   audio.setVolume(settings.sound, settings.volume);
   updateTouchControls();
   trySaveSettings(settingsStatus);
@@ -531,7 +603,13 @@ function fit() {
   const h = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   renderer.resize(w, h);
 }
-new ResizeObserver(fit).observe(stage);
+if (window.ResizeObserver) {
+  new ResizeObserver(fit).observe(stage);
+} else {
+  // Oude browsers (bijv. op digiborden): bij venstergrootte en schermwissels opnieuw meten.
+  window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', () => setTimeout(fit, 200));
+}
 fit();
 
 document.addEventListener('visibilitychange', () => {
@@ -570,8 +648,8 @@ function syncHud() {
     const m = game.message;
     toast.hidden = !m;
     if (m) {
-      toast.querySelector('.toast-title').textContent = m.title ?? '';
-      toast.querySelector('.toast-text').textContent = m.text ?? '';
+      toast.querySelector('.toast-title').textContent = m.title || '';
+      toast.querySelector('.toast-text').textContent = m.text || '';
     }
   }
 }
@@ -593,3 +671,6 @@ function frame(now) {
 renderWho();
 show('menu');
 requestAnimationFrame(frame);
+window.__snelwegStarted = true; // voor de startcontrole in index.html
+const bootError = document.querySelector('.boot-error');
+if (bootError) bootError.remove(); // toch gestart (bijv. na trage verbinding)

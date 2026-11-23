@@ -43,12 +43,12 @@ function readRaw(key) {
     let { version, data } = parsed;
     if (version > VERSION) return null; // gemaakt door een nieuwere versie van het spel
     while (version < VERSION) {
-      const migrate = MIGRATIONS[key]?.[version];
+      const migrate = MIGRATIONS[key] && MIGRATIONS[key][version];
       data = migrate ? migrate(data) : data;
       version += 1;
     }
     return data;
-  } catch {
+  } catch (e) {
     return null; // geen toegang (privémodus/blokkade) of kapotte JSON: val terug op standaard
   }
 }
@@ -66,17 +66,31 @@ function writeRaw(key, data) {
 
 // --- Instellingen -----------------------------------------------------------
 
+// touchAuto / smartboardAuto: zolang de speler deze instellingen niet zelf heeft aangepast,
+// mag het spel ze automatisch aanzetten bij de eerste aanraking van het scherm.
 function defaultSettings() {
   const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-  return { sound: true, volume: 0.8, vibrate: true, touchButtons: touch, lastName: '' };
+  return {
+    sound: true,
+    volume: 0.8,
+    vibrate: true,
+    touchButtons: touch,
+    tapToWalk: true,
+    smartboard: false,
+    touchAuto: true,
+    smartboardAuto: true,
+    lastName: '',
+  };
 }
+
+const BOOLEAN_SETTINGS = ['sound', 'vibrate', 'touchButtons', 'tapToWalk', 'smartboard', 'touchAuto', 'smartboardAuto'];
 
 export function loadSettings() {
   const defaults = defaultSettings();
   const data = readRaw('settings');
   if (!data || typeof data !== 'object') return defaults;
   const out = { ...defaults };
-  for (const key of ['sound', 'vibrate', 'touchButtons']) {
+  for (const key of BOOLEAN_SETTINGS) {
     if (typeof data[key] === 'boolean') out[key] = data[key];
   }
   if (Number.isFinite(data.volume)) out.volume = Math.min(1, Math.max(0, data.volume));
@@ -117,7 +131,7 @@ function cleanProfile(p) {
 export function loadProfiles() {
   const data = readRaw('profiles');
   const seen = new Set();
-  const list = (Array.isArray(data?.list) ? data.list : [])
+  const list = (data && Array.isArray(data.list) ? data.list : [])
     .map(cleanProfile)
     .filter((p) => p && !seen.has(p.id) && seen.add(p.id))
     .slice(0, MAX_PROFILES);
@@ -173,7 +187,7 @@ function cleanEntry(e) {
   const score = Math.floor(Number(e.score));
   if (!Number.isFinite(score) || score < 0) return null;
   const entry = {
-    name: String(e.name ?? 'Speler').slice(0, NAME_MAX_LENGTH) || 'Speler',
+    name: String(e.name == null ? 'Speler' : e.name).slice(0, NAME_MAX_LENGTH) || 'Speler',
     score,
     level: Math.max(1, Math.floor(Number(e.level)) || 1),
     date: typeof e.date === 'string' ? e.date : '',
@@ -188,7 +202,7 @@ export function loadHighscores() {
   const data = readRaw('highscores');
   const out = {};
   for (const mode of MODES) {
-    const list = Array.isArray(data?.[mode]) ? data[mode] : [];
+    const list = data && Array.isArray(data[mode]) ? data[mode] : [];
     out[mode] = list
       .map(cleanEntry)
       .filter(Boolean)

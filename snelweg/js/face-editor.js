@@ -63,7 +63,8 @@ export class FaceEditor {
       this.zoom = MAX_ZOOM ** (Number(zoomInput.value) / 100);
       this.clampAndDraw(false);
     });
-    new ResizeObserver(() => this.resize()).observe(canvas);
+    if (window.ResizeObserver) new ResizeObserver(() => this.resize()).observe(canvas);
+    else window.addEventListener('resize', () => this.resize()); // oude browsers
   }
 
   open(source) {

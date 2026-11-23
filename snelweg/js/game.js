@@ -204,7 +204,8 @@ export class Game {
     this.hitDuration = this.timer;
     // Aanrijdingseffect: zwaar voertuig = plat als een pannenkoek, licht voertuig = wegtollen.
     this.hitStyle = vehicle.type === 'truck' || vehicle.type === 'van' ? 'flat' : 'spin';
-    this.hitDir = this.traffic.laneByRow.get(this.player.row)?.dir ?? 1;
+    const lane = this.traffic.laneByRow.get(this.player.row);
+    this.hitDir = lane ? lane.dir : 1;
     this.moves = [];
     this.onEvent('hit', { vehicle });
   }

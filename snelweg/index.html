@@ -7,6 +7,37 @@
     <title>Snelweg Oversteken</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="css/style.css" />
+    <script>
+      // Startcontrole (bewust geen module en oude syntax): als het spel niet opstart, bijvoorbeeld
+      // in een verouderde browser op een digibord, tonen we een duidelijke melding met de
+      // browserversie in plaats van een half scherm.
+      (function () {
+        var errors = [];
+        window.addEventListener('error', function (e) {
+          errors.push((e && e.message) || 'onbekende fout');
+        });
+        function report() {
+          if (window.__snelwegStarted || document.querySelector('.boot-error')) return;
+          var box = document.createElement('div');
+          box.className = 'boot-error';
+          box.setAttribute('role', 'alert');
+          var ua = navigator.userAgent;
+          var chrome = ua.match(/Chrome\/(\d+)/);
+          box.innerHTML =
+            '<h2>Het spel kan niet starten in deze browser</h2>' +
+            '<p>Deze browser is waarschijnlijk te oud. Probeer een recente versie van Chrome, Edge of Firefox.</p>' +
+            '<p class="boot-ua"></p>';
+          box.querySelector('.boot-ua').textContent =
+            (chrome ? 'Chrome-versie: ' + chrome[1] + ' · ' : '') + ua + (errors.length ? ' · Fout: ' + errors[0] : '');
+          document.body.appendChild(box);
+        }
+        window.addEventListener('load', function () {
+          setTimeout(report, 2500);
+        });
+        // Ook als 'load' uitblijft (trage verbinding); main.js haalt de melding weg zodra het spel start.
+        setTimeout(report, 8000);
+      })();
+    </script>
     <script type="module" src="js/main.js"></script>
   </head>
   <body>
@@ -35,7 +66,13 @@
         </div>
       </main>
 
-      <!-- Pijlknoppen op het scherm (mobiel) -->
+      <!-- Pijlknoppen op het scherm (mobiel/smartboard). De linkerset is alleen voor de smartboard-modus. -->
+      <div id="touch-controls-left" class="touch-controls tc-side-left" hidden>
+        <button type="button" class="tc tc-up" data-dir="0,-1" tabindex="-1" aria-label="Omhoog">▲</button>
+        <button type="button" class="tc tc-left" data-dir="-1,0" tabindex="-1" aria-label="Links">◀</button>
+        <button type="button" class="tc tc-right" data-dir="1,0" tabindex="-1" aria-label="Rechts">▶</button>
+        <button type="button" class="tc tc-down" data-dir="0,1" tabindex="-1" aria-label="Omlaag">▼</button>
+      </div>
       <div id="touch-controls" class="touch-controls" hidden>
         <button type="button" class="tc tc-up" data-dir="0,-1" tabindex="-1" aria-label="Omhoog">▲</button>
         <button type="button" class="tc tc-left" data-dir="-1,0" tabindex="-1" aria-label="Links">◀</button>
@@ -58,6 +95,7 @@
             <li>Vrachtwagen bromt laag, motor ratelt hoog.</li>
             <li>Tik = stap, belletje = middenberm, loopje = overkant.</li>
             <li><kbd>Spatie</kbd>: waar sta ik? (hoger = verder, links/rechts = kolom)</li>
+            <li>Touchscreen: tik bovenin = vooruit, onderin = terug, in het midden links of rechts = opzij.</li>
           </ul>
           <p class="note">Je punten tellen ×3, in een eigen highscorelijst. Na een aanrijding zie je 2 seconden wat je raakte.</p>
           <nav class="menu">
@@ -82,7 +120,7 @@
             <button type="button" class="btn" data-action="highscores">Highscores</button>
             <button type="button" class="btn" data-action="settings">Instellingen</button>
           </nav>
-          <p class="hint">Pijltjes of WASD om te lopen · swipen op mobiel · P of Esc voor pauze</p>
+          <p class="hint">Pijltjes of WASD om te lopen · tikken of swipen op een touchscreen · P of Esc voor pauze</p>
         </div>
       </section>
 
@@ -230,8 +268,14 @@
             <label class="range"><span>Volume</span><input type="range" name="volume" min="0" max="100" step="5" /></label>
             <label class="toggle"><span>Trillen (mobiel)</span><input type="checkbox" name="vibrate" /></label>
             <label class="toggle"><span>Pijlknoppen op het scherm</span><input type="checkbox" name="touchButtons" /></label>
+            <label class="toggle"><span>Tik om te lopen</span><input type="checkbox" name="tapToWalk" /></label>
+            <label class="toggle"><span>Smartboard-modus (alles groot)</span><input type="checkbox" name="smartboard" /></label>
           </form>
-          <p class="note">Trillen werkt in noncha mode op telefoons die het ondersteunen (Android). Swipen werkt altijd, ook zonder pijlknoppen.</p>
+          <p class="note">
+            Tik om te lopen: tik op het speelveld en je poppetje zet een stap die kant op. Smartboard-modus: grote knoppen en
+            pijlknoppen aan beide kanten. Bij de eerste aanraking van een touchscreen gaan pijlknoppen (en op een groot scherm de
+            smartboard-modus) vanzelf aan. Trillen werkt in noncha mode op telefoons die het ondersteunen (Android).
+          </p>
           <p id="settings-status" class="status" role="status" aria-live="polite"></p>
           <nav class="menu">
             <button type="button" class="btn" data-action="back">Terug</button>

@@ -63,7 +63,7 @@ const isHex = (v) => typeof v === 'string' && /^#[0-9a-f]{3,8}$/i.test(v);
 export function cleanLook(look) {
   const out = { ...DEFAULT_LOOK };
   if (!look || typeof look !== 'object') return out;
-  if (typeof look.base === 'string' && Object.hasOwn(BASES, look.base)) out.base = look.base;
+  if (typeof look.base === 'string' && Object.prototype.hasOwnProperty.call(BASES, look.base)) out.base = look.base;
   for (const k of ['shirt', 'pants', 'hatColor']) if (isHex(look[k])) out[k] = look[k];
   if (HATS.some((h) => h.id === look.hat)) out.hat = look.hat;
   // Highscores uit stap 2 bewaarden huid/haar los; die blijven zo getekend.
@@ -83,7 +83,7 @@ export function randomLook(rng = Math.random) {
 }
 
 function resolve(look) {
-  const base = BASES[look?.base] ?? BASES[DEFAULT_LOOK.base];
+  const base = (look && BASES[look.base]) || BASES[DEFAULT_LOOK.base];
   return { ...base, ...DEFAULT_LOOK, ...look };
 }
 
@@ -153,7 +153,7 @@ export function getFace(url, onLoad) {
  */
 export function drawCharacter(ctx, look = DEFAULT_LOOK, opts = {}) {
   const { hit = false, shadow = true } = opts;
-  const flat = opts.flat ?? (hit ? 1 : 0);
+  const flat = typeof opts.flat === 'number' ? opts.flat : hit ? 1 : 0;
   const a = resolve(look);
   const faceImg = getFace(opts.face, opts.onFaceLoad);
   ctx.save();
@@ -284,7 +284,7 @@ function drawHairFront(ctx, a) {
       ctx.moveTo(0, HEAD_Y - HEAD_R);
       ctx.lineTo(0, HEAD_Y - HEAD_R - 0.1);
       ctx.stroke();
-      circle(ctx, 0, HEAD_Y - HEAD_R - 0.11, 0.035, a.eyes ?? '#e63946');
+      circle(ctx, 0, HEAD_Y - HEAD_R - 0.11, 0.035, a.eyes || '#e63946');
       break;
     default:
       break; // kaal
@@ -306,7 +306,7 @@ function drawEyes(ctx, a, hit) {
     }
     return;
   }
-  ctx.fillStyle = a.eyes ?? '#222';
+  ctx.fillStyle = a.eyes || '#222';
   const w = a.eyes ? 0.05 : 0.035;
   ctx.fillRect(-0.058 - w / 2, HEAD_Y - 0.022, w, 0.045);
   ctx.fillRect(0.058 - w / 2, HEAD_Y - 0.022, w, 0.045);

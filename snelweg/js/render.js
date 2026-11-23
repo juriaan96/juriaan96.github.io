@@ -55,8 +55,8 @@ export class Renderer {
     this.scale = 1;
     this.particles = [];
     const motion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
-    this.reducedMotion = !!motion?.matches;
-    motion?.addEventListener?.('change', (e) => (this.reducedMotion = e.matches));
+    this.reducedMotion = !!(motion && motion.matches);
+    if (motion && motion.addEventListener) motion.addEventListener('change', (e) => (this.reducedMotion = e.matches));
   }
 
   resize(availW, availH) {
@@ -137,6 +137,7 @@ export class Renderer {
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       this.particles.length = 0;
+      this.tap = null;
       return;
     }
     // Kort schudden direct na een aanrijding
@@ -162,6 +163,30 @@ export class Renderer {
     if (game.mode === 'noncha' && game.state === 'hit' && game.hitBy) this.drawReveal(game);
     if (game.state !== 'ready' && game.state !== 'gameover') this.drawPlayer(game);
     this.drawParticles(game.paused ? 0 : dt);
+    this.drawTapMarker(dt);
+  }
+
+  /** Tik-om-te-lopen: kort kringetje op de plek van de tik (in vakjes). */
+  markTap(x, y) {
+    this.tap = { x, y, t: 0 };
+  }
+
+  drawTapMarker(dt) {
+    if (!this.tap) return;
+    this.tap.t += dt;
+    const k = this.tap.t / 0.35;
+    if (k >= 1) {
+      this.tap = null;
+      return;
+    }
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255, 212, 0, ${0.9 * (1 - k)})`;
+    ctx.lineWidth = 0.06;
+    ctx.beginPath();
+    ctx.arc(this.tap.x, this.tap.y, 0.15 + 0.3 * k, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   /** Noncha: na een aanrijding het voertuig markeren dat je raakte. */
