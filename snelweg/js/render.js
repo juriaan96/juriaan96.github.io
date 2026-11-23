@@ -76,6 +76,13 @@ export class Renderer {
     this.drawBackground(this.bg.getContext('2d'));
   }
 
+  /** Schermpositie → positie op het speelveld (in vakjes). */
+  screenToGrid(clientX, clientY) {
+    const r = this.canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    return { gx: ((clientX - r.left) / r.width) * COLS, gy: ((clientY - r.top) / r.height) * ROWS };
+  }
+
   // --- Statische achtergrond (één keer per resize) -------------------------
 
   drawBackground(ctx) {

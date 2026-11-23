@@ -80,9 +80,12 @@ function defaultSettings() {
     touchAuto: true,
     smartboardAuto: true,
     nonchaGlimpse: 4, // noncha: elke zoveel seconden even het speelveld zien (0 = nooit)
+    view: '2d', // weergave: '2d' (bovenaanzicht) of '3d' (schuin meekijken)
     lastName: '',
   };
 }
+
+export const VIEWS = ['2d', '3d'];
 
 export const GLIMPSE_OPTIONS = [0, 6, 4, 2];
 
@@ -98,6 +101,7 @@ export function loadSettings() {
   }
   if (Number.isFinite(data.volume)) out.volume = Math.min(1, Math.max(0, data.volume));
   if (GLIMPSE_OPTIONS.includes(data.nonchaGlimpse)) out.nonchaGlimpse = data.nonchaGlimpse;
+  if (VIEWS.includes(data.view)) out.view = data.view;
   if (typeof data.lastName === 'string') out.lastName = data.lastName.slice(0, NAME_MAX_LENGTH);
   return out;
 }

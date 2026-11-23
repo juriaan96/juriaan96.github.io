@@ -17,10 +17,11 @@ export class Input {
   constructor(swipeTarget, handlers, isEnabled) {
     this.handlers = handlers;
     this.isEnabled = isEnabled;
-    this.pointer = null;
+    // Elke vinger apart (op pointerId), zodat in samen spelen twee spelers tegelijk kunnen swipen.
+    this.pointers = new Map();
     swipeTarget.addEventListener('pointerdown', (e) => this.onPointerDown(e));
     swipeTarget.addEventListener('pointerup', (e) => this.onPointerUp(e));
-    swipeTarget.addEventListener('pointercancel', () => (this.pointer = null));
+    swipeTarget.addEventListener('pointercancel', (e) => this.pointers.delete(e.pointerId));
     // Geen browsergebaren (fling/dubbeltik) op het speelveld: anders kan de eerste tik ná een
     // swipe "ingeslikt" worden. Pointer-events (onze swipes) blijven gewoon werken.
     swipeTarget.addEventListener(
@@ -62,15 +63,15 @@ export class Input {
   }
 
   onPointerDown(e) {
-    if (!e.isPrimary || !this.isEnabled()) return;
+    if (!this.isEnabled()) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    this.pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   }
 
   onPointerUp(e) {
-    const start = this.pointer;
-    this.pointer = null;
-    if (!start || start.id !== e.pointerId || !this.isEnabled()) return;
+    const start = this.pointers.get(e.pointerId);
+    this.pointers.delete(e.pointerId);
+    if (!start || !this.isEnabled()) return;
     const dx = e.clientX - start.x;
     const dy = e.clientY - start.y;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_MIN_PX) {

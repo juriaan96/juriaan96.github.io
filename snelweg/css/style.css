@@ -118,6 +118,21 @@ body {
   margin: 0;
 }
 
+.panel-corner-left {
+  right: auto;
+  left: 10px;
+}
+
+/* Wisselknop 2D/3D: toont de weergave waar je naartoe wisselt */
+.view-btn {
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+}
+
+.icon-btn + .panel-corner {
+  margin-left: 0;
+}
+
 /* --- Speelveld -------------------------------------------------------------- */
 
 #stage {

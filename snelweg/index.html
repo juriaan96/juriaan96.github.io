@@ -59,12 +59,14 @@
           <span class="label">Levens</span>
           <span id="hud-lives" class="value lives" role="img" aria-label="3 levens">♥♥♥</span>
         </div>
+        <button id="btn-view" class="icon-btn view-btn" type="button" data-action="view" aria-label="Wissel naar 3D-weergave">3D</button>
         <button id="btn-fs" class="icon-btn" type="button" data-action="fullscreen" aria-label="Volledig scherm" hidden>⛶</button>
         <button id="btn-pause" class="icon-btn" type="button" aria-label="Pauze">❚❚</button>
       </header>
 
       <main id="stage">
         <canvas id="game" aria-label="Speelveld"></canvas>
+        <canvas id="game3d" aria-label="Speelveld (3D)" hidden></canvas>
         <div id="toast" aria-hidden="true" hidden>
           <p class="toast-title"></p>
           <p class="toast-text"></p>
@@ -145,6 +147,7 @@
           </nav>
           <p class="hint">Pijltjes of WASD om te lopen · tikken of swipen op een touchscreen · P of Esc voor pauze</p>
           <!-- Achteraan in de volgorde (focus begint op Spelen), visueel rechtsboven in het paneel -->
+          <button type="button" class="icon-btn panel-corner panel-corner-left view-btn" id="menu-view" data-action="view" aria-label="Wissel naar 3D-weergave">3D</button>
           <button type="button" class="icon-btn panel-corner" id="menu-fs" data-action="fullscreen" title="Volledig scherm" aria-label="Volledig scherm" hidden>⛶</button>
         </div>
       </section>
@@ -333,6 +336,7 @@
         <div class="panel">
           <h2 id="settings-title">Instellingen</h2>
           <form id="settings-form" class="settings">
+            <label class="toggle"><span>3D-weergave (schuin meekijken)</span><input type="checkbox" name="view3d" /></label>
             <label class="toggle"><span>Geluid</span><input type="checkbox" name="sound" /></label>
             <label class="range"><span>Volume</span><input type="range" name="volume" min="0" max="100" step="5" /></label>
             <label class="toggle"><span>Trillen (mobiel)</span><input type="checkbox" name="vibrate" /></label>

@@ -1,6 +1,7 @@
 import { COLS, ROWS } from './config.js';
 import { Game } from './game.js';
 import { Renderer } from './render.js';
+import { Renderer3D } from './render3d.js';
 import { Input } from './input.js';
 import { createAvatar } from './character.js';
 import { Customizer, displayName } from './customizer.js';
@@ -73,7 +74,10 @@ const faceEditor = new FaceEditor($('face-canvas'), $('face-zoom'));
 const audio = new AudioEngine();
 audio.setVolume(settings.sound, settings.volume);
 const game = new Game({ onGameOver: showGameOver, onEvent: onGameEvent, onDuelOver: showDuelOver });
-const renderer = new Renderer(canvas);
+const renderer2d = new Renderer(canvas);
+const canvas3d = $('game3d');
+let renderer3d = null; // pas aangemaakt bij de eerste keer 3D
+let renderer = renderer2d;
 
 // Browsers staan geluid pas toe na een gebruikersactie.
 for (const type of ['pointerdown', 'keydown']) {
@@ -240,7 +244,13 @@ function updateVibration(now) {
   }
 }
 
-if (new URLSearchParams(location.search).has('debug')) window.__snelweg = { game, audio };
+if (new URLSearchParams(location.search).has('debug')) window.__snelweg = {
+    game,
+    audio,
+    get renderer3d() {
+      return renderer3d;
+    },
+  };
 
 // --- Schermwissel ------------------------------------------------------------
 
@@ -356,6 +366,10 @@ const actions = {
     if (isFullscreen()) exitFullscreen();
     else enterFullscreen();
     $('btn-fs').blur();
+  },
+  view: () => {
+    setView(settings.view === '3d' ? '2d' : '3d');
+    trySaveSettings();
   },
   'face-use': () => closeFaceEditor(faceEditor.export()),
   'face-cancel': () => closeFaceEditor(null),
@@ -502,16 +516,20 @@ function onTap(clientX, clientY, pointerType) {
   const who = game.mode === 'duel' ? sideOf(clientX) : 0;
   // Muisklikken alleen in de smartboard-modus (sommige digiborden geven aanraking door als muis).
   if (pointerType === 'mouse' && !(settings.smartboard || forceSmartboard)) return;
-  const r = canvas.getBoundingClientRect();
-  const gx = ((clientX - r.left) / r.width) * COLS;
-  const gy = ((clientY - r.top) / r.height) * ROWS;
   let dx;
   let dy;
   if (game.mode === 'noncha') {
-    if (gy < ROWS / 3) [dx, dy] = [0, -1];
-    else if (gy > (ROWS * 2) / 3) [dx, dy] = [0, 1];
-    else [dx, dy] = [gx < COLS / 2 ? -1 : 1, 0];
+    // Vaste vlakken van het (zwarte) speelveld, in 2D en 3D gelijk
+    const r = renderer.canvas.getBoundingClientRect();
+    const fx = (clientX - r.left) / r.width;
+    const fy = (clientY - r.top) / r.height;
+    if (fy < 1 / 3) [dx, dy] = [0, -1];
+    else if (fy > 2 / 3) [dx, dy] = [0, 1];
+    else [dx, dy] = [fx < 0.5 ? -1 : 1, 0];
   } else {
+    const pos = renderer.screenToGrid(clientX, clientY);
+    if (!pos) return;
+    const { gx, gy } = pos;
     const me = game.players[who] || game.player;
     const px = me.col + 0.5;
     const py = me.row + 0.5;
@@ -565,6 +583,10 @@ const input = new Input(
 
 window.addEventListener('keydown', (e) => {
   if (e.defaultPrevented) return; // al afgehandeld (bijv. door de gezichteditor)
+  if (current === 'game' && e.code === 'KeyV' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    actions.view(); // V: wissel tussen 2D en 3D
+    return;
+  }
   if (current === 'game') {
     input.handleKey(e);
     return;
@@ -855,6 +877,7 @@ function openSettings() {
   f.touchButtons.checked = settings.touchButtons;
   f.tapToWalk.checked = settings.tapToWalk;
   f.smartboard.checked = settings.smartboard || forceSmartboard;
+  f.view3d.checked = settings.view === '3d';
   setStatus(settingsStatus, '');
   show('settings');
 }
@@ -870,6 +893,15 @@ settingsForm.addEventListener('input', (e) => {
   // Zelf gekozen: niet meer automatisch aanpassen bij aanraking.
   if (e.target.name === 'touchButtons') settings.touchAuto = false;
   if (e.target.name === 'smartboard') settings.smartboardAuto = false;
+  if (e.target.name === 'view3d') {
+    const ok3d = setView(f.view3d.checked ? '3d' : '2d');
+    f.view3d.checked = settings.view === '3d';
+    if (!ok3d) {
+      trySaveSettings();
+      setStatus(settingsStatus, '3D werkt niet in deze browser (geen WebGL). Het spel blijft in 2D.', 'error');
+      return;
+    }
+  }
   audio.setVolume(settings.sound, settings.volume);
   updateTouchControls();
   trySaveSettings(settingsStatus);
@@ -895,6 +927,45 @@ function fit() {
   const w = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const h = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   renderer.resize(w, h);
+}
+
+// --- Weergave: 2D (bovenaanzicht) of 3D (schuin meekijken) ---------------------------------
+
+/**
+ * Wisselt de weergave. Zonder WebGL blijft het 2D; geeft dan false terug.
+ * De spellogica merkt er niets van: alleen het tekenen verandert.
+ */
+function setView(view) {
+  let ok = true;
+  if (view === '3d' && !renderer3d) {
+    renderer3d = Renderer3D.create(canvas3d);
+    if (!renderer3d) ok = false;
+  }
+  if (view === '3d' && (!renderer3d || renderer3d.lost)) {
+    view = '2d';
+    ok = false;
+  }
+  settings.view = view;
+  renderer = view === '3d' ? renderer3d : renderer2d;
+  canvas.hidden = view === '3d';
+  canvas3d.hidden = view !== '3d';
+  const next = view === '3d' ? '2D' : '3D';
+  for (const btn of [$('btn-view'), $('menu-view')]) {
+    btn.textContent = next;
+    btn.setAttribute('aria-label', `Wissel naar ${next}-weergave`);
+    btn.title = btn.getAttribute('aria-label');
+  }
+  fit();
+  return ok;
+}
+
+/** 3D te traag of de grafische kaart haakt af: terug naar 2D, met een melding. */
+function checkRenderer3d() {
+  if (renderer !== renderer3d || !(renderer3d.tooSlow || renderer3d.lost)) return;
+  setView('2d');
+  trySaveSettings();
+  announce('3D liep niet soepel op dit scherm. Het spel staat weer in 2D.');
+  if (game.active) game.setMessage({ title: 'Terug naar 2D', text: '3D liep niet soepel op dit scherm', toast: true }, 2.5);
 }
 /**
  * Het spel vult precies het zichtbare deel van het scherm. Oude browsers (o.a. op digiborden)
@@ -986,6 +1057,7 @@ function frame(now) {
   last = now;
   game.update(dt);
   renderer.draw(game, dt);
+  checkRenderer3d();
   updateAudio();
   updateVibration(now);
   updateSensor(now);
@@ -995,6 +1067,7 @@ function frame(now) {
 
 renderWho();
 updateFullscreenButtons();
+setView(settings.view);
 show('menu');
 requestAnimationFrame(frame);
 window.__snelwegStarted = true; // voor de startcontrole in index.html

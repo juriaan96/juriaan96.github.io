@@ -18,7 +18,9 @@ export const PLAYER_HALF_WIDTH = 0.28; // hitbox is smaller dan het poppetje (~0
 
 // Verkeer
 export const VEHICLE_HIT_INSET = 0.08; // botsrand van voertuigen iets naar binnen
-export const SPAWN_MARGIN = 1; // voertuigen ontstaan/verdwijnen zo ver buiten beeld
+// Voertuigen ontstaan/verdwijnen zo ver buiten het speelveld. In 3D zie je verder opzij dan
+// het veld breed is; daar komen ze dan uit de nevel in plaats van ineens te verschijnen.
+export const SPAWN_MARGIN = 6;
 
 // Voertuigtypes: lengte in vakjes, snelheid als factor op de rijstrooksnelheid.
 export const VEHICLE_TYPES = {
