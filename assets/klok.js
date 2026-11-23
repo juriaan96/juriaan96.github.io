@@ -354,6 +354,87 @@ function run(T, auto, base) {
     CHIMES[i].play(n, out, short);
     return CHIMES[i].name;
   }
+  /* bekende deuntjes, allemaal vrij van auteursrecht (klassiek of traditioneel), als speeldoos.
+     notatie: noot/duur in tellen (standaard 1), R = rust; oct schuift octaven op */
+  const TUNES = [
+    { name: 'Für Elise van Beethoven', bpm: 110, n: 'E5/.5 D#5/.5 E5/.5 D#5/.5 E5/.5 B4/.5 D5/.5 C5/.5 A4 R/.5 C4/.5 E4/.5 A4/.5 B4 R/.5 E4/.5 G#4/.5 B4/.5 C5 R/.5 E4/.5 E5/.5 D#5/.5 E5/.5 D#5/.5 E5/.5 B4/.5 D5/.5 C5/.5 A4/2' },
+    { name: 'Ode an die Freude van Beethoven', bpm: 150, oct: 1, n: 'F#4 F#4 G4 A4 A4 G4 F#4 E4 D4 D4 E4 F#4 F#4/1.5 E4/.5 E4/2 F#4 F#4 G4 A4 A4 G4 F#4 E4 D4 D4 E4 F#4 E4/1.5 D4/.5 D4/2' },
+    { name: 'Eine kleine Nachtmusik van Mozart', bpm: 130, oct: 1, n: 'G4 R/.5 D4/.5 G4 R/.5 D4/.5 G4/.5 D4/.5 G4/.5 B4/.5 D5/2 C5 R/.5 A4/.5 C5 R/.5 A4/.5 C5/.5 A4/.5 F#4/.5 A4/.5 D4/2' },
+    { name: 'de Turkse mars van Mozart', bpm: 100, n: 'B4/.25 A4/.25 G#4/.25 A4/.25 C5 D5/.25 C5/.25 B4/.25 C5/.25 E5 F5/.25 E5/.25 D#5/.25 E5/.25 B5/.25 A5/.25 G#5/.25 A5/.25 B5/.25 A5/.25 G#5/.25 A5/.25 C6/2' },
+    { name: 'In de hal van de bergkoning van Grieg', bpm: 140, oct: 1, n: 'B3/.5 C#4/.5 D4/.5 E4/.5 F#4/.5 D4/.5 F#4 F4/.5 C#4/.5 F4 E4/.5 C4/.5 E4 B3/.5 C#4/.5 D4/.5 E4/.5 F#4/.5 D4/.5 F#4/.5 B4/.5 A4/.5 F#4/.5 D4/.5 F#4/.5 A4/2' },
+    { name: 'de Wilhelm Tell-ouverture van Rossini', bpm: 150, n: 'G4/.33 G4/.33 G4/.34 G4/.33 G4/.33 G4/.34 G4/.33 G4/.33 C5/.34 D5 E5 R/.5 G4/.33 G4/.33 G4/.34 G4/.33 G4/.33 G4/.34 G4/.33 G4/.33 C5/.34 D5 C5/2' },
+    { name: 'Vader Jacob', bpm: 140, oct: 1, n: 'C4 D4 E4 C4 C4 D4 E4 C4 E4 F4 G4/2 E4 F4 G4/2 G4/.5 A4/.5 G4/.5 F4/.5 E4 C4 G4/.5 A4/.5 G4/.5 F4/.5 E4 C4 C4 G3 C4/2' },
+    { name: 'Altijd is Kortjakje ziek', bpm: 130, oct: 1, n: 'C4 C4 G4 G4 A4 A4 G4/2 F4 F4 E4 E4 D4 D4 C4/2' }
+  ];
+  const THEME_TUNES = {
+    herfst: [
+      { name: 'In de maneschijn', bpm: 110, oct: 1, n: 'C4 C4 C4 D4 E4/2 D4/2 C4 E4 D4 D4 C4/2' },
+      { name: 'Altijd is Kortjakje ziek', bpm: 130, oct: 1, n: 'C4 C4 G4 G4 A4 A4 G4/2 F4 F4 E4 E4 D4 D4 C4/2' }
+    ],
+    sinterklaas: [
+      { name: 'de Toreador uit Carmen, helemaal uit Spanje', bpm: 110, n: 'C5/.75 D5/.25 C5/.5 A4/.5 A4/.5 A4/.5 G4/.25 A4/.25 A#4/.5 A4/2' }
+    ],
+    kerst: [
+      { name: 'Jingle Bells', bpm: 170, n: 'E5 E5 E5/2 E5 E5 E5/2 E5 G5 C5/1.5 D5/.5 E5/4' },
+      { name: 'Stille nacht', bpm: 140, oct: 1, n: 'G4/1.5 A4/.5 G4 E4/3 G4/1.5 A4/.5 G4 E4/3 D5/2 D5 B4/3 C5/2 C5 G4/3' },
+      { name: 'Deck the halls', bpm: 160, oct: 1, n: 'G4/1.5 F4/.5 E4 D4 C4 D4 E4 C4 D4/.5 E4/.5 F4/.5 D4/.5 E4/1.5 D4/.5 C4 B3 C4/2' }
+    ],
+    winter: [
+      { name: 'Jingle Bells', bpm: 170, n: 'E5 E5 E5/2 E5 E5 E5/2 E5 G5 C5/1.5 D5/.5 E5/4' },
+      { name: 'het wiegenlied van Brahms', bpm: 110, oct: 1, n: 'E4/.5 E4/.5 G4/2 E4/.5 E4/.5 G4/2 E4/.5 G4/.5 C5 B4/1.5 A4/.5 A4 G4/2' }
+    ],
+    blokhut: [
+      { name: 'Morgenstemming van Grieg', bpm: 90, n: 'G5/.5 E5/.5 D5/.5 C5/.5 D5/.5 E5/.5 G5/.5 E5/.5 D5/.5 C5/.5 D5/.25 E5/.25 D5/.25 E5/.25 G5/.5 E5/.5 G5/.5 A5/.5 E5/.5 A5/.5 G5/.5 E5/.5 D5/.5 C5/2' },
+      { name: 'het wiegenlied van Brahms', bpm: 110, oct: 1, n: 'E4/.5 E4/.5 G4/2 E4/.5 E4/.5 G4/2 E4/.5 G4/.5 C5 B4/1.5 A4/.5 A4 G4/2' }
+    ],
+    voorjaar: [
+      { name: 'Alle eendjes zwemmen in het water', bpm: 130, oct: 1, n: 'C4/.5 D4/.5 E4/.5 F4/.5 G4 G4 A4/.5 A4/.5 A4/.5 A4/.5 G4/2 A4/.5 A4/.5 A4/.5 A4/.5 G4/2 F4/.5 F4/.5 F4/.5 F4/.5 E4 E4 D4/.5 D4/.5 D4/.5 D4/.5 C4/2' },
+      { name: 'De lente van Vivaldi', bpm: 130, n: 'E5 G#5 G#5 G#5 F#5/.5 E5/.5 B5/2 B5/.5 A5/.5 G#5 G#5 G#5 F#5/.5 E5/.5 B5/2' },
+      { name: 'Morgenstemming van Grieg', bpm: 90, n: 'G5/.5 E5/.5 D5/.5 C5/.5 D5/.5 E5/.5 G5/.5 E5/.5 D5/.5 C5/.5 D5/.25 E5/.25 D5/.25 E5/.25 G5/.5 E5/.5 G5/.5 A5/.5 E5/.5 A5/.5 G5/.5 E5/.5 D5/.5 C5/2' }
+    ],
+    pasen: [
+      { name: 'De lente van Vivaldi', bpm: 130, n: 'E5 G#5 G#5 G#5 F#5/.5 E5/.5 B5/2 B5/.5 A5/.5 G#5 G#5 G#5 F#5/.5 E5/.5 B5/2' },
+      { name: 'Alle eendjes zwemmen in het water', bpm: 130, oct: 1, n: 'C4/.5 D4/.5 E4/.5 F4/.5 G4 G4 A4/.5 A4/.5 A4/.5 A4/.5 G4/2 A4/.5 A4/.5 A4/.5 A4/.5 G4/2 F4/.5 F4/.5 F4/.5 F4/.5 E4 E4 D4/.5 D4/.5 D4/.5 D4/.5 C4/2' }
+    ],
+    zomer: [
+      { name: 'Kumbaya, een kampvuurlied', bpm: 120, oct: 1, n: 'C4/.5 E4/.5 G4 G4 G4/2 A4/.5 A4/.5 G4/2 C4/.5 E4/.5 G4 G4 G4/2 F4/.5 E4/.5 D4/2 C4/.5 E4/.5 G4 G4 G4/2 A4/.5 A4/.5 G4/2 F4 E4 D4 D4 C4/2' },
+      { name: 'Oh my darling Clementine', bpm: 130, oct: 1, n: 'F4/.75 F4/.25 F4 C4 A4/.75 A4/.25 A4 F4 F4/.75 A4/.25 C5/1.5 C5/.5 A#4/.5 A4/.5 G4/2' }
+    ]
+  };
+  const SEMI = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  function noteFreq(s) {
+    const m = /^([A-G])(#|b)?(\d)$/.exec(s);
+    if (!m) return 0;
+    const midi = 12 * (+m[3] + 1) + SEMI[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+  /* speeldoos: helder getokkeld toontje met korte nagalm */
+  function boxNote(delay, f, vol, out) {
+    tone(delay, f, vol, 1.3, out);
+    tone(delay, f * 2, vol * 0.28, 0.7, out);
+    tone(delay, f * 4.2, vol * 0.08, 0.25, out);
+  }
+  function playTune(tu, out) {
+    const beat = 60 / tu.bpm, mul = Math.pow(2, tu.oct || 0);
+    let t = 0;
+    tu.n.split(' ').forEach(tok => {
+      const p = tok.split('/'), d = p[1] ? parseFloat(p[1]) : 1;
+      if (p[0] !== 'R') boxNote(t, noteFreq(p[0]) * mul, 0.2, out);
+      t += d * beat;
+    });
+  }
+  /* klik op de klok: een eigen seizoensdeuntje, een bekend klassiek deuntje of een bekende klok */
+  let lastClick = '';
+  function clickSound(out) {
+    const own = THEME_TUNES[T.slug] || [];
+    for (let tries = 0; tries < 6; tries++) {
+      const r = R();
+      if (own.length && r < 0.4) { const tu = own[Math.floor(R() * own.length)]; if (tu.name === lastClick) continue; playTune(tu, out); return (lastClick = tu.name); }
+      if (r < 0.7) { const tu = TUNES[Math.floor(R() * TUNES.length)]; if (tu.name === lastClick) continue; playTune(tu, out); return (lastClick = tu.name); }
+      return (lastClick = famousChime(2, out, true));
+    }
+    return (lastClick = famousChime(2, out, true));
+  }
   function chime(kind) {
     try {
       initAudio();
@@ -361,7 +442,7 @@ function run(T, auto, base) {
       if (kind === 'famous') {
         if (clickG) clickG.gain.setTargetAtTime(0, ac.currentTime, 0.05);
         clickG = ac.createGain(); clickG.connect(fx);
-        return famousChime(2, clickG, true);
+        return clickSound(clickG);
       }
       if (kind === 'bells') { bell(0, 784, 0.22, fx); bell(0.4, 659, 0.22, fx); bell(0.8, 523, 0.22, fx); bell(1.2, 392, 0.22, fx); }
       else if (kind === 'cuckoo') { for (let i = 0; i < 2; i++) { tone(i * 0.9, 740, 0.3, 0.35, fx); tone(i * 0.9 + 0.38, 587, 0.3, 0.5, fx); } }
