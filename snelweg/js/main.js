@@ -1,4 +1,3 @@
-import { COLS, ROWS } from './config.js';
 import { Game, MAX_LEVEL } from './game.js';
 import { Renderer } from './render.js';
 import { Renderer3D } from './render3d.js';
@@ -87,7 +86,7 @@ for (const type of ['pointerdown', 'keydown']) {
 
 // --- Geluid, trillen en meldingen bij spelgebeurtenissen ---------------------------
 
-const VEHICLE_NAMES = { car: 'een auto', van: 'een bestelbus', truck: 'een vrachtwagen', motor: 'een motor', sport: 'een sportwagen', fire: 'de brandweer', ambulance: 'een ambulance', police: 'de politie', tractor: 'een trekker', bike: 'een fietser', bakfiets: 'een bakfiets', scooter: 'een snorfiets' };
+const VEHICLE_NAMES = { car: 'een auto', van: 'een bestelbus', truck: 'een vrachtwagen', motor: 'een motor', sport: 'een sportwagen', fire: 'de brandweer', ambulance: 'een ambulance', police: 'de politie', tractor: 'een trekker', bike: 'een fietser', bakfiets: 'een bakfiets', scooter: 'een snorfiets', dsi: 'de DSI', policemotor: 'een politiemotor' };
 /** Naam van een rij voor schermlezers; hangt af van het wegtype (fietspad, berm, rijstrook n). */
 function rowName(row) {
   const kinds = rowKinds(game.params.theme);
@@ -123,7 +122,14 @@ function vibrate(pattern) {
 
 function onGameEvent(type, data = {}) {
   const who = data.player || 0;
-  audio.play(type === 'duelwin' ? 'finish' : type, { pan: playerPan(who) });
+  // Gebeurtenissen op een plek (aanrijding) klinken van die kant, anders vanaf de speler
+  const me = game.players[who] || game.player;
+  const pan = typeof data.x === 'number' ? Math.max(-1, Math.min(1, (data.x - (me.col + 0.5)) / 5)) : playerPan(who);
+  audio.play(type === 'duelwin' ? 'finish' : type, { pan });
+  if (type === 'crash') {
+    announce('Ongeluk! Pas op, er tollen auto’s over de weg.');
+    vibrate([60, 40, 120]);
+  }
   if (game.mode === 'duel') {
     onDuelEvent(type, who, data);
     return;
@@ -166,7 +172,7 @@ function onGameEvent(type, data = {}) {
 function where() {
   if (!game.active) return;
   const p = game.player;
-  audio.play('where', { row: p.row, pan: playerPan() });
+  audio.play('where', { row: p.row, start: game.layout.start, pan: playerPan() });
   const side = p.col < 5 ? 'links' : p.col > 7 ? 'rechts' : 'midden';
   announce(`Je staat op ${rowName(p.row)}, ${side} (positie ${p.col + 1} van 13).`);
 }

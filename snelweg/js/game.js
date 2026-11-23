@@ -74,6 +74,11 @@ export class Game {
     this.place = pickPlace(this.params.theme); // plaats aan de overkant (wisselt per level)
   }
 
+  /** Indeling van het speelveld (rijen, middenberm, start) voor dit level. */
+  get layout() {
+    return this.traffic.layout;
+  }
+
   get theme() {
     return THEMES[this.params.theme] || THEMES.nl130;
   }
@@ -143,10 +148,15 @@ export class Game {
   startLevel(freshGame = false) {
     this.traffic.reset(this.level, this.mode === 'duel' ? 'normal' : this.mode, freshGame);
     this.place = pickPlace(this.params.theme, this.place);
+    // Aantal rijen en de startrij hangen af van het wegtype
+    for (const p of [this.player, this.player2]) {
+      p.rows = this.layout.rows;
+      p.startRow = this.layout.start;
+    }
     for (const p of this.players) p.reset();
     this.moves2 = [];
     this.winner = -1;
-    this.furthestRow = ROW_START;
+    this.furthestRow = this.layout.start;
     this.crossTime = 0;
     this.glimpseClock = 0;
     this.moves = [];
@@ -242,6 +252,11 @@ export class Game {
     // Noncha: tijdens de onthulling staat het verkeer stil, zodat je ziet wat je raakte.
     const frozen = this.state === 'hit' && this.mode === 'noncha';
     if (!frozen) this.traffic.update(dt);
+    // Gebeurtenissen uit het verkeer (gepiep van remmen, aanrijding) alleen tijdens het spelen
+    if (this.traffic.events.length) {
+      const events = this.traffic.events.splice(0);
+      if (this.active) for (const e of events) this.onEvent(e.type, e);
+    }
     for (const p of this.players) p.update(dt);
 
     if (this.messageTimer > 0) {
@@ -284,8 +299,8 @@ export class Game {
       const [dx, dy] = this.moves.shift();
       if (this.player.tryMove(dx, dy)) {
         const row = this.player.row;
-        if (row === ROW_MEDIAN) this.onEvent('median');
-        else if (row === ROW_START && dy > 0) this.onEvent('start');
+        if (row === this.layout.median) this.onEvent('median');
+        else if (row === this.layout.start && dy > 0) this.onEvent('start');
         else if (row !== ROW_FINISH) this.onEvent('step');
       } else if (this.player.cooldown <= 0) {
         this.onEvent('blocked');
@@ -323,7 +338,7 @@ export class Game {
       if (queue.length && p.cooldown <= 0) {
         const [dx, dy] = queue.shift();
         if (p.tryMove(dx, dy)) {
-          if (p.row === ROW_MEDIAN) this.onEvent('median', { player: i });
+          if (p.row === this.layout.median) this.onEvent('median', { player: i });
           else if (p.row !== ROW_FINISH) this.onEvent('step', { player: i });
         } else {
           this.onEvent('blocked', { player: i });

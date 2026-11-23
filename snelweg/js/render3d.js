@@ -16,7 +16,7 @@
 //
 // Zelfde interface als Renderer (render.js): resize, draw, confetti, markTap, screenToGrid.
 
-import { COLS, ROWS, ROW_MEDIAN } from './config.js';
+import { COLS, ROWS } from './config.js';
 import { drawCharacter } from './character.js';
 import { PLAYER_COLORS, shade } from './render.js';
 import { THEMES, rowKinds } from './themes.js';
@@ -33,7 +33,7 @@ const FOG = [0.79, 0.84, 0.89];
 const MAX_BOXES = 2700; // 2700 × 24 hoekpunten past in 16-bit indices
 const MAX_QUADS = 256;
 const MAX_PIXELS = 2.2e6; // bovengrens voor de tekenresolutie (4K-borden)
-const RAIL_Z = ROW_MEDIAN + 0.28; // vangrail iets achter het midden, zodat je ervóór staat
+// Vangrail iets achter het midden van de middenberm, zodat je ervóór staat (z = middenberm + 0.28)
 // Plekken van het landschap per land (x, z) achter de overkant
 const WINDMILL = [3.8, -2.0]; // molen (NL provinciale weg)
 const FRITUUR = [3.4, -1.5]; // frituur (België)
@@ -53,11 +53,12 @@ const SPR_HU = SPR_H / SPR_W; // hoogte in eenheden
 const FEET_FROM_BOTTOM = SPR_HU - SPR_TOP - 0.4; // voeten staan op y = 0.4 in drawCharacter
 
 // Punten die altijd in beeld moeten zijn (het hele speelveld)
-const FIT_POINTS = [
+/** Punten die altijd in beeld moeten zijn (het hele speelveld), voor een veld van ows rijen. */
+const fitPoints = (rows) => [
   [-0.15, 0, -0.1],
   [COLS + 0.15, 0, -0.1],
-  [-0.15, 0, ROWS + 0.1],
-  [COLS + 0.15, 0, ROWS + 0.1],
+  [-0.15, 0, rows + 0.1],
+  [COLS + 0.15, 0, rows + 0.1],
   [0.6, 2.05, 0.3], // bovenkant van de borden op de overkant
   [COLS - 1.5, 1.7, 0.3],
   [COLS / 2, 1.8, -1.6], // een strookje landschap achter de overkant (molen, bomen)
@@ -397,6 +398,7 @@ export class Renderer3D {
     this.particles = [];
     this.tap = null;
     this.cam = { tx: COLS / 2, tz: ROWS / 2 + 0.1 };
+    this.rows = ROWS;
     this.pitch = PITCH_WIDE;
     this.sprites = new Map();
     this.textures = new Map();
@@ -604,9 +606,12 @@ export class Renderer3D {
 
     // Per rij: rijbaan, middenberm of fietspad (de rest is gras: overkant, start, berm)
     const kinds = rowKinds(themeId);
+    const median = kinds.indexOf('median');
+    const railZ = median + 0.28;
+    this.rows = kinds.length; // minder rijstroken = minder rijen
     const joint = rgb('#7f817f');
     const bikeHex = t.bike || '#b4473a';
-    for (let row = 0; row < ROWS; row++) {
+    for (let row = 0; row < kinds.length; row++) {
       const k = kinds[row];
       const zc = row + 0.5;
       if (k === 'road' || k === 'median') {
@@ -639,7 +644,7 @@ export class Renderer3D {
     }
 
     // Strepen: kantstrepen langs elke rijbaan, onderbroken strepen tussen rijstroken
-    for (let row = 0; row < ROWS; row++) {
+    for (let row = 0; row < kinds.length; row++) {
       if (kinds[row] !== 'road') continue;
       const above = kinds[row - 1];
       const below = kinds[row + 1];
@@ -651,43 +656,46 @@ export class Renderer3D {
     // Middenberm
     if (t.median === 'green') {
       // Nederland: groene middenmarkering tussen twee witte lijnen
-      b.box(XC, 0.01, ROW_MEDIAN + 0.5, W, 0.004, 0.44, rgb('#3f8a4e'));
-      b.box(XC, 0.011, ROW_MEDIAN + 0.25, W, 0.004, 0.06, line);
-      b.box(XC, 0.011, ROW_MEDIAN + 0.75, W, 0.004, 0.06, line);
+      b.box(XC, 0.01, median + 0.5, W, 0.004, 0.44, rgb('#3f8a4e'));
+      b.box(XC, 0.011, median + 0.25, W, 0.004, 0.06, line);
+      b.box(XC, 0.011, median + 0.75, W, 0.004, 0.06, line);
     } else if (t.median === 'double') {
       // België: dubbele doorgetrokken streep
-      b.box(XC, 0.011, ROW_MEDIAN + 0.43, W, 0.004, 0.06, line);
-      b.box(XC, 0.011, ROW_MEDIAN + 0.57, W, 0.004, 0.06, line);
+      b.box(XC, 0.011, median + 0.43, W, 0.004, 0.06, line);
+      b.box(XC, 0.011, median + 0.57, W, 0.004, 0.06, line);
     } else if (t.median === 'concrete') {
       // Betonnen barrier (breed onder, smal boven)
       const beton = rgb('#c4c4bd');
-      b.box(XC, 0, RAIL_Z + 0.05, W, 0.18, 0.42, beton);
-      b.box(XC, 0.18, RAIL_Z + 0.05, W, 0.3, 0.18, beton);
+      b.box(XC, 0, railZ + 0.05, W, 0.18, 0.42, beton);
+      b.box(XC, 0.18, railZ + 0.05, W, 0.3, 0.18, beton);
     } else {
-      b.box(XC, 0.01, ROW_MEDIAN + 0.5, W, 0.006, 0.64, grass);
-      for (let x = -14.85; x < COLS + 15; x += 0.6) b.box(x, 0, RAIL_Z, 0.07, 0.4, 0.07, post);
-      b.box(XC, 0.27, RAIL_Z + 0.03, W, 0.13, 0.05, rgb('#c9ced6'));
-      b.box(XC, 0.39, RAIL_Z + 0.03, W, 0.012, 0.055, rgb('#eef1f5'));
+      b.box(XC, 0.01, median + 0.5, W, 0.006, 0.64, grass);
+      for (let x = -14.85; x < COLS + 15; x += 0.6) b.box(x, 0, railZ, 0.07, 0.4, 0.07, post);
+      b.box(XC, 0.27, railZ + 0.03, W, 0.13, 0.05, rgb('#c9ced6'));
+      b.box(XC, 0.39, railZ + 0.03, W, 0.012, 0.055, rgb('#eef1f5'));
     }
 
     // Grasplukjes en in de berm: hectometerpaaltjes (NL) of straatlantaarns (BE)
-    for (let row = 0; row < ROWS; row++) {
+    for (let row = 0; row < kinds.length; row++) {
       const k = kinds[row];
       if (k !== 'finish' && k !== 'start' && k !== 'verge') continue;
       for (let i = 0; i < 70; i++) {
         b.box(-1 + rnd() * (COLS + 2), 0, row + 0.06 + rnd() * 0.88, 0.05, 0.03, 0.05, rnd() < 0.5 ? grassDark : grassLight);
       }
-      if (k !== 'verge') continue;
-      const toward = kinds[row + 1] === 'road' || kinds[row + 1] === 'bike' ? 1 : -1; // kant van de weg
-      const z = row + 0.5 + toward * 0.3;
+      // Langs de weg op de overkant en de startberm (op de overkant niet bij het plaatsbord)
+      const toward = k === 'finish' ? 1 : -1; // kant van de weg
+      const z = row + 0.5 + toward * 0.36;
+      const free = (x) => k !== 'finish' || x < 9.3 || x > COLS + 0.3;
       if (t.verge === 'hecto') {
         for (let x = -8.2; x < COLS + 8; x += 3) {
+          if (!free(x)) continue;
           b.box(x, 0, z, 0.09, 0.45, 0.07, rgb('#2f6b3a'));
           b.box(x, 0.3, z + 0.01, 0.07, 0.1, 0.07, rgb('#ffffff'));
         }
-      } else if (t.verge === 'lamps' && row < ROW_MEDIAN) {
+      } else if (t.verge === 'lamps' && k === 'finish') {
         // Alleen aan de overkant: aan de startkant zouden de palen het verkeer verbergen
         for (let x = -9.3; x < COLS + 9; x += 3.5) {
+          if (!free(x)) continue;
           b.box(x, 0, z - toward * 0.25, 0.07, 1.7, 0.07, rgb('#4b5563'));
           b.box(x, 1.65, z + toward * 0.08, 0.06, 0.06, 0.7, rgb('#4b5563'));
           b.box(x, 1.57, z + toward * 0.4, 0.2, 0.08, 0.26, rgb('#ffe39a'));
@@ -695,8 +703,8 @@ export class Renderer3D {
       }
     }
 
-    // Landschap achter de overkant
-    b.box(XC, 0, -0.32, W, 0.32, 0.36, rgb(shade(t.grass, -0.3))); // haag
+    // Landschap achter de overkant (op de Afsluitdijk: geen haag maar het water)
+    if (t.decor !== 'afsluitdijk') b.box(XC, 0, -0.32, W, 0.32, 0.36, rgb(shade(t.grass, -0.3))); // haag
     const trunk = rgb('#6b4423');
     const greens = ['#3f7d34', '#4a8a3a', '#356b2c', '#5b9640'].map(rgb);
     const tree = (x, z, i) => {
@@ -723,7 +731,7 @@ export class Renderer3D {
         b.box(x, 0, z, 0.14, 0.35, 0.14, trunk);
         for (let k = 0; k < 4; k++) b.box(x, 0.3 + k * 0.45, z, s * (1 - k * 0.22), 0.46, s * (1 - k * 0.22), fir, Math.PI / 4);
       }
-    } else {
+    } else if (t.scenery !== 'none') {
       for (let i = 0; i < 48; i++) tree(-14 + rnd() * (COLS + 28), -1.1 - rnd() * 8, i);
     }
     // Typisch voor het land, achter de overkant
@@ -849,6 +857,25 @@ export class Renderer3D {
         this.cow(b, 9.6, -2.7, true);
         break;
       }
+      case 'afsluitdijk': {
+        // Afsluitdijk: Waddenzee achter de overkant (met basalt op het talud), IJsselmeer achter de start
+        const wad = rgb('#5b7f95');
+        const meer = rgb('#4f7fa0');
+        const basalt = rgb('#3d4045');
+        b.box(COLS / 2, -0.06, -0.55, 140, 0.06, 0.5, basalt); // talud
+        for (let x = -20; x < COLS + 20; x += 0.5) b.box(x, -0.005, -0.55, 0.03, 0.006, 0.5, rgb('#55595f'));
+        b.box(COLS / 2, -0.04, -30.8, 140, 0.05, 60, wad); // Waddenzee
+        const z0 = this.rows + 0.45;
+        b.box(COLS / 2, -0.06, z0 + 0.15, 140, 0.06, 0.3, rgb(shade(t.grass, -0.2)));
+        b.box(COLS / 2, -0.04, z0 + 30.3, 140, 0.05, 60, meer); // IJsselmeer
+        // Het monument: stenen uitkijktoren
+        const stone = rgb('#d8d2c4');
+        b.box(2.6, 0, -0.15, 0.8, 1.6, 0.8, stone, Math.PI / 4);
+        b.box(2.6, 1.6, -0.15, 0.95, 0.12, 0.95, rgb('#b9b1a0'), Math.PI / 4);
+        b.box(2.6, 1.72, -0.15, 0.5, 0.35, 0.5, stone, Math.PI / 4);
+        b.box(2.6, 0.4, 0.27, 0.22, 0.5, 0.02, rgb('#2b2b2b'), 0); // deur
+        break;
+      }
       case 'noisewall': {
         // Geluidsscherm langs de snelweg
         const panel = rgb('#7f8f7a');
@@ -868,6 +895,21 @@ export class Renderer3D {
       }
       default:
         break;
+    }
+  }
+
+  /** Afsluitdijk: zeilbootjes die langzaam over de Waddenzee varen. */
+  drawBoats(b) {
+    const white = rgb('#f5f5f5');
+    const hull = rgb('#6b4423');
+    for (const [speed, z, offset, sail] of [
+      [0.35, -1.6, 0, '#f5f5f5'],
+      [-0.25, -2.6, 9, '#e63946'],
+    ]) {
+      const x = ((((this.time * speed + offset) % 40) + 40) % 40) - 13;
+      b.box(x, -0.02, z, 0.9, 0.18, 0.32, hull);
+      b.box(x, 0.16, z, 0.04, 1.0, 0.04, white); // mast
+      b.box(x + 0.22 * Math.sign(speed), 0.24, z, 0.4, 0.8, 0.02, rgb(sail)); // zeil
     }
   }
 
@@ -912,7 +954,7 @@ export class Renderer3D {
       const mid = (lo + hi) / 2;
       const { vp } = this.camera(tx, tz, mid, aspect);
       let fits = true;
-      for (const p of FIT_POINTS) {
+      for (const p of fitPoints(this.rows)) {
         const [x, y, w] = project(vp, p[0], p[1], p[2]);
         if (w <= 0 || Math.abs(x) > 0.97 || Math.abs(y) > 0.95) {
           fits = false;
@@ -930,15 +972,15 @@ export class Renderer3D {
    * is rond het speelveld en het strookje landschap. Per schermverhouding één keer berekend.
    */
   balancedTz(aspect) {
-    const key = `${aspect.toFixed(2)}:${this.pitch.toFixed(3)}`;
+    const key = `${aspect.toFixed(2)}:${this.pitch.toFixed(3)}:${this.rows}`;
     if (this.balanced && this.balanced.key === key) return this.balanced.tz;
-    let tz = ROWS / 2;
+    let tz = this.rows / 2;
     for (let it = 0; it < 6; it++) {
       const dist = this.fitDistance(COLS / 2, tz, aspect);
       const { vp } = this.camera(COLS / 2, tz, dist, aspect);
       let ymin = Infinity;
       let ymax = -Infinity;
-      for (const p of FIT_POINTS) {
+      for (const p of fitPoints(this.rows)) {
         const y = project(vp, p[0], p[1], p[2])[1];
         ymin = Math.min(ymin, y);
         ymax = Math.max(ymax, y);
@@ -953,7 +995,7 @@ export class Renderer3D {
   updateCamera(game, dt) {
     // Een beetje meekijken met de speler (of het midden tussen twee spelers)
     let fx = COLS / 2;
-    let fz = ROWS / 2;
+    let fz = this.rows / 2;
     if (game.state !== 'ready' && game.state !== 'gameover') {
       const ps = game.players;
       fx = ps.reduce((s, p) => s + p.col + 0.5, 0) / ps.length;
@@ -964,7 +1006,7 @@ export class Renderer3D {
     const aspect = this.cssW / this.cssH;
     this.pitch = lerp(PITCH_TALL, PITCH_WIDE, clamp01((aspect - 0.6) / 0.6));
     const tx = COLS / 2 + (fx - COLS / 2) * 0.3;
-    const tz = this.balancedTz(aspect) + (fz - ROWS / 2) * 0.3;
+    const tz = this.balancedTz(aspect) + (fz - this.rows / 2) * 0.3;
     const k = Math.min(1, dt * 4);
     this.cam.tx += (tx - this.cam.tx) * k;
     this.cam.tz += (tz - this.cam.tz) * k;
@@ -1047,12 +1089,12 @@ export class Renderer3D {
       return;
     }
 
-    this.updateCamera(game, dt);
     const theme = game.theme;
     if (game.params.theme !== this.builtTheme) {
       this.buildStatic(game.params.theme);
       this.static.upload();
     }
+    this.updateCamera(game, dt);
     gl.clearColor(FOG[0], FOG[1], FOG[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
@@ -1074,6 +1116,12 @@ export class Renderer3D {
         this.addVehicle(dyn, v, lane);
       }
     }
+    // Wrakken na een aanrijding (tijdens het wegslepen verdwijnen ze)
+    for (const w of game.traffic.wrecks) {
+      if (w.phase === 'fade' && w.t > 0.3) continue;
+      this.addVehicle(dyn, w.v, { dir: w.dir }, w);
+    }
+    if (theme.decor === 'afsluitdijk') this.drawBoats(dyn);
     if (theme.decor === 'tulips') this.drawWindmill(dyn);
     if (theme.decor === 'turbines') this.drawTurbines(dyn);
     this.updateParticles(game.paused ? 0 : dt, dyn);
@@ -1243,14 +1291,26 @@ export class Renderer3D {
 
   // --- Voertuigen -------------------------------------------------------------------------
 
-  addVehicle(b, v, lane) {
+  /** @param {object} [wreck] wrak na een aanrijding: { x, y, rot } (eigen plek en draaiing) */
+  addVehicle(b, v, lane, wreck = null) {
     const L = v.length;
-    const cx = v.x + L / 2;
-    const cz = lane.row + 0.5;
+    const cx = wreck ? wreck.x : v.x + L / 2;
+    const cz = wreck ? wreck.y : lane.row + 0.5;
     const f = lane.dir; // neus wijst in de rijrichting
     const color = rgb(v.color);
+    // Draaiing om de y-as (zelfde draairichting als in 2D)
+    const r = wreck ? -wreck.rot : 0;
+    const rc = Math.cos(r);
+    const rs = Math.sin(r);
     // Onderdeel: van a0 tot a1 in de lengte (positief = voorkant), y0..y1, breedte w
-    const part = (a0, a1, y0, y1, w, c, dz = 0) => b.box(cx + (f * (a0 + a1)) / 2, y0, cz + dz, Math.abs(a1 - a0), y1 - y0, w, c);
+    const part = (a0, a1, y0, y1, w, c, dz = 0) => {
+      const lx = (f * (a0 + a1)) / 2;
+      b.box(cx + lx * rc + dz * rs, y0, cz - lx * rs + dz * rc, Math.abs(a1 - a0), y1 - y0, w, c, r);
+    };
+    if (wreck && Math.floor(this.time * 3) % 2 === 0) {
+      // Alarmlichten knipperen
+      for (const a of [L / 2 - 0.05, -L / 2 + 0.05]) for (const s of [-1, 1]) part(a - 0.05, a + 0.05, 0.3, 0.4, 0.1, rgb('#ffb020'), s * 0.3);
+    }
     const tyre = rgb('#16181b');
     const glass = rgb('#2c3e50');
     const head = rgb('#fff6c2');
@@ -1299,6 +1359,35 @@ export class Renderer3D {
         part(-L / 2, -L / 2 + 0.14, 0.4, 0.44, 0.66, dark); // spoiler
         wheels([L / 2 - 0.3, -L / 2 + 0.32], 0.6, 0.16);
         lights(L / 2, -L / 2, 0.16, 0.24, 0.22);
+        break;
+      }
+      case 'dsi': {
+        // Zwarte auto (DSI) met getinte ruiten en blauwe flitslichten in de grille
+        const tint = rgb('#0d1117');
+        part(-L / 2, L / 2, 0.1, 0.4, 0.66, color);
+        part(-L / 2 + 0.28, L / 2 - 0.4, 0.4, 0.66, 0.58, tint);
+        part(-L / 2 + 0.32, L / 2 - 0.46, 0.66, 0.7, 0.6, color);
+        wheels([L / 2 - 0.32, -L / 2 + 0.32], 0.6);
+        lights(L / 2, -L / 2, 0.22, 0.3, 0.22);
+        const phase = Math.floor(this.time * 9 + v.x * 0.5) % 2;
+        for (const [s, on] of [
+          [-1, phase === 0],
+          [1, phase === 1],
+        ]) {
+          part(L / 2 - 0.01, L / 2 + 0.02, 0.2, 0.3, 0.12, rgb(on ? '#dbeafe' : '#1e3a8a'), s * 0.12);
+          if (on) this.glows.push([cx + f * (L / 2 + 0.05), 0.28, cz + s * 0.12]);
+        }
+        break;
+      }
+      case 'policemotor': {
+        // Politiemotor met blauw licht
+        wheels([0.3, -0.3], 0, 0.2);
+        part(-0.38, 0.4, 0.14, 0.32, 0.18, color);
+        part(-0.2, 0.1, 0.32, 0.64, 0.3, rgb('#1d4ed8')); // agent
+        part(-0.1, 0.12, 0.62, 0.82, 0.22, rgb('#f5f5f5')); // helm
+        const on = Math.floor(this.time * 9 + v.x * 0.5) % 2 === 0;
+        part(0.3, 0.38, 0.4, 0.5, 0.12, rgb(on ? '#dbeafe' : '#1e3a8a'));
+        if (on) this.glows.push([cx + f * 0.36, 0.5, cz]);
         break;
       }
       case 'tractor': {

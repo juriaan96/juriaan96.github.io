@@ -19,6 +19,9 @@ const ENGINES = {
   // Fietsen: zacht zoemen van de banden, en een belletje als ze vlak bij je zijn
   bike: { freq: 140, wave: 'triangle', lp: 300, noise: 2600, noiseGain: 0.6, gain: 0.16, bell: true },
   bakfiets: { freq: 120, wave: 'triangle', lp: 300, noise: 2200, noiseGain: 0.7, gain: 0.2, bell: true },
+  // DSI-colonne: zwarte auto's zonder sirene; de politiemotoren voorop en achteraan met een snelle sirene
+  dsi: { freq: 70, wave: 'sawtooth', lp: 650, noise: 850, noiseGain: 0.35, gain: 0.42 },
+  policemotor: { freq: 160, wave: 'sawtooth', lp: 2200, noise: 2600, noiseGain: 0.25, gain: 0.45, tremolo: 26, siren: { lo: 740, hi: 1180, rate: 2.5 } },
   // Hulpdiensten: motor + tweetoonsirene (lo/hi in Hz, rate = wisselingen per seconde / 2)
   fire: { freq: 42, wave: 'sawtooth', lp: 380, noise: 260, noiseGain: 0.6, gain: 0.8, sub: true, siren: { lo: 440, hi: 587, rate: 0.75 } },
   ambulance: { freq: 64, wave: 'sawtooth', lp: 560, noise: 700, noiseGain: 0.4, gain: 0.55, siren: { lo: 554, hi: 740, rate: 0.9 } },
@@ -145,7 +148,7 @@ export class AudioEngine {
    * @param {string} name
    * @param {object} [opts] { pan: -1..1 (links/rechts), row: 0..8 (voor 'where') }
    */
-  play(name, { pan = 0, row = 0 } = {}) {
+  play(name, { pan = 0, row = 0, start = 8 } = {}) {
     if (!this.ready) return;
     const t = this.ctx.currentTime + 0.005;
     switch (name) {
@@ -171,7 +174,8 @@ export class AudioEngine {
         break;
       case 'where': {
         // Waar sta ik? Toonhoogte = rij (hoger = verder), links/rechts = kolom.
-        const steps = 8 - row; // 0 = startberm … 8 = overkant
+        // 0 = startberm … 8 = overkant (bij minder rijen naar verhouding)
+        const steps = ((start - row) / Math.max(1, start)) * 8;
         const f = 330 * 2 ** (steps / 8);
         this.tone(f, t, 0.12, { type: 'sine', gain: 0.3, pan });
         this.tone(f, t + 0.16, 0.12, { type: 'sine', gain: 0.3, pan });
@@ -192,6 +196,18 @@ export class AudioEngine {
         break;
       case 'gameover':
         [392, 330, 262, 196].forEach((f, i) => this.tone(f, t + i * 0.22, 0.3, { type: 'square', gain: 0.1 }));
+        break;
+      case 'skid': // piepende banden (remmen voor een aanrijding)
+        this.noiseBurst(t, 0.6, { freq: 2600, endFreq: 1700, q: 8, gain: 0.35, pan });
+        this.tone(1900, t, 0.55, { type: 'sawtooth', endFreq: 1500, gain: 0.05, pan });
+        break;
+      case 'crash': // klap, blik en glas
+        this.noiseBurst(t, 0.7, { freq: 1800, endFreq: 200, q: 0.6, gain: 0.8, type: 'lowpass', pan });
+        this.tone(90, t, 0.4, { endFreq: 35, gain: 0.7, pan });
+        this.tone(160, t + 0.08, 0.3, { type: 'square', endFreq: 60, gain: 0.25, pan });
+        for (let i = 0; i < 6; i++) {
+          this.tone(3200 + Math.random() * 2400, t + 0.12 + i * 0.05, 0.08, { type: 'sine', gain: 0.06, pan });
+        }
         break;
       case 'bell': // fietsbel: tring-tring
         for (const d of [0, 0.16]) {

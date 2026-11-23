@@ -6,13 +6,16 @@ export class Player {
     this.look = { ...DEFAULT_LOOK };
     this.face = null; // data-URL van het eigen gezicht
     this.startCol = Math.floor(COLS / 2);
+    // Het aantal rijen hangt af van het wegtype (zie layoutFor in themes.js); de game zet dit
+    this.rows = ROWS;
+    this.startRow = ROW_START;
     this.reset();
   }
 
   /** Terug naar de startberm (in "Samen spelen" heeft elke speler een eigen startkolom). */
   reset() {
     this.col = this.startCol;
-    this.row = ROW_START;
+    this.row = this.startRow;
     // Aanrijding per speler (alleen gebruikt in "Samen spelen")
     this.hitTimer = 0;
     this.hitDuration = 1;
@@ -30,7 +33,7 @@ export class Player {
     if (this.cooldown > 0) return false;
     const col = this.col + dx;
     const row = this.row + dy;
-    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return false;
+    if (col < 0 || col >= COLS || row < 0 || row >= this.rows) return false;
     this.fromCol = this.col;
     this.fromRow = this.row;
     this.col = col;

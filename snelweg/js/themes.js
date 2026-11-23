@@ -111,19 +111,19 @@ export const THEMES = {
     places: ['Basel', 'Bern', 'Luzern', 'Zürich', 'Chur', 'Thun', 'Lugano', 'Interlaken'],
   },
   nl130: {
-    label: 'Snelweg',
+    label: 'Afsluitdijk',
     lanes: null,
     speedSign: 'matrix',
     median: 'rail',
     edge: 'solid',
     road: '#45484e',
-    grass: '#5a9443',
-    verge: '',
-    decor: 'noisewall',
+    grass: '#6a9a4a',
+    verge: 'hecto',
+    decor: 'afsluitdijk', // water aan beide kanten, basalt, monument, zeilboot
     placeSign: 'nl-anwb',
     flag: 'nl',
-    scenery: 'trees',
-    places: ['Utrecht', 'Amersfoort', 'Eindhoven', 'Zwolle', 'Arnhem', 'Breda', 'Groningen', 'Den Haag', 'Nijmegen', 'Venlo'],
+    scenery: 'none',
+    places: ['Leeuwarden', 'Harlingen', 'Bolsward', 'Franeker', 'Sneek', 'Kornwerderzand', 'Zurich', 'Den Oever', 'Den Helder', 'Wieringerwerf'],
   },
   de: {
     label: 'Autobahn',
@@ -157,19 +157,46 @@ export function themeIdFor(speedLimit) {
   return 'nl80';
 }
 
+const layoutCache = new Map();
+
 /**
- * Soort per rij (0..8): 'finish', 'road', 'bike', 'verge' (berm), 'median', 'start'.
- * Zonder eigen lanes: 3 + 3 rijstroken.
+ * Indeling van het speelveld voor dit wegtype. Rijen zonder rijstrook of fietspad vallen weg,
+ * zodat je nooit een lege rij hoeft over te steken: een weg met minder rijstroken heeft dus
+ * minder rijen (en grotere vakjes op het scherm).
+ * - rows:   aantal rijen (0 = overkant … rows - 1 = startberm)
+ * - median: rij van de middenberm
+ * - start:  rij van de startberm
+ * - kinds:  soort per rij: 'finish', 'road', 'bike', 'median', 'start'
+ * - lanes:  rijstroken met hun rij in deze indeling (null = 3 + 3 uit config.js, rijen 1–3 en 5–7)
  */
-export function rowKinds(themeId) {
+export function layoutFor(themeId) {
+  let layout = layoutCache.get(themeId);
+  if (layout) return layout;
   const t = THEMES[themeId] || THEMES.nl130;
-  const kinds = ['finish', 'verge', 'verge', 'verge', 'median', 'verge', 'verge', 'verge', 'start'];
-  if (!t.lanes) {
-    for (const r of [1, 2, 3, 5, 6, 7]) kinds[r] = 'road';
-  } else {
-    for (const lane of t.lanes) kinds[lane.row] = lane.kind;
-  }
-  return kinds;
+  // Eerst op het volle raster van 9 rijen, daarna de lege rijen eruit
+  const full = ['finish', 'verge', 'verge', 'verge', 'median', 'verge', 'verge', 'verge', 'start'];
+  if (!t.lanes) for (const r of [1, 2, 3, 5, 6, 7]) full[r] = 'road';
+  else for (const lane of t.lanes) full[lane.row] = lane.kind;
+  const map = [];
+  const kinds = [];
+  full.forEach((k, r) => {
+    map[r] = kinds.length;
+    if (k !== 'verge') kinds.push(k);
+  });
+  layout = {
+    rows: kinds.length,
+    median: kinds.indexOf('median'),
+    start: kinds.length - 1,
+    kinds,
+    lanes: t.lanes ? t.lanes.map((lane) => ({ ...lane, row: map[lane.row] })) : null,
+  };
+  layoutCache.set(themeId, layout);
+  return layout;
+}
+
+/** Soort per rij voor dit wegtype (zie layoutFor). */
+export function rowKinds(themeId) {
+  return layoutFor(themeId).kinds;
 }
 
 /** Een plaats voor aan de overkant: willekeurig, en niet dezelfde als de vorige. */

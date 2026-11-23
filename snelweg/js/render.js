@@ -1,6 +1,6 @@
-import { COLS, ROWS, ROW_FINISH, ROW_MEDIAN, ROW_START } from './config.js';
+import { COLS, ROWS, ROW_FINISH } from './config.js';
 import { drawCharacter } from './character.js';
-import { THEMES, rowKinds } from './themes.js';
+import { THEMES, rowKinds, layoutFor } from './themes.js';
 import { paintUnlimited, paintRoundSign, paintPlaceSign, paintFlag } from './signs.js';
 
 const C = {
@@ -80,12 +80,14 @@ export class Renderer {
   }
 
   resize(availW, availH) {
-    const tilePx = Math.max(10, Math.floor(Math.min(availW / COLS, availH / ROWS)));
+    this.avail = [availW, availH];
+    const rows = this.rows;
+    const tilePx = Math.max(10, Math.floor(Math.min(availW / COLS, availH / rows)));
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const w = Math.round(tilePx * COLS * dpr);
-    const h = Math.round(tilePx * ROWS * dpr);
+    const h = Math.round(tilePx * rows * dpr);
     this.canvas.style.width = `${tilePx * COLS}px`;
-    this.canvas.style.height = `${tilePx * ROWS}px`;
+    this.canvas.style.height = `${tilePx * rows}px`;
     if (w === this.canvas.width && h === this.canvas.height) return;
     this.canvas.width = this.bg.width = w;
     this.canvas.height = this.bg.height = h;
@@ -93,19 +95,30 @@ export class Renderer {
     this.drawBackground(this.bg.getContext('2d'));
   }
 
-  /** De achtergrond opnieuw tekenen als het wegtype verandert (zie themes.js). */
+  /** Aantal rijen van het huidige wegtype (minder rijstroken = minder rijen = grotere vakjes). */
+  get rows() {
+    return this.themeId ? layoutFor(this.themeId).rows : ROWS;
+  }
+
+  /** Bij een ander wegtype: opnieuw schalen (ander aantal rijen) en de achtergrond tekenen. */
   syncBackground(game) {
     const id = game.params.theme;
     if (id === this.themeId) return;
+    const before = this.rows;
     this.themeId = id;
-    this.drawBackground(this.bg.getContext('2d'));
+    if (this.rows !== before && this.avail) {
+      this.canvas.width = 0; // forceer opnieuw schalen
+      this.resize(this.avail[0], this.avail[1]);
+    } else {
+      this.drawBackground(this.bg.getContext('2d'));
+    }
   }
 
   /** Schermpositie → positie op het speelveld (in vakjes). */
   screenToGrid(clientX, clientY) {
     const r = this.canvas.getBoundingClientRect();
     if (!r.width || !r.height) return null;
-    return { gx: ((clientX - r.left) / r.width) * COLS, gy: ((clientY - r.top) / r.height) * ROWS };
+    return { gx: ((clientX - r.left) / r.width) * COLS, gy: ((clientY - r.top) / r.height) * this.rows };
   }
 
   // --- Statische achtergrond (één keer per resize) -------------------------
@@ -125,7 +138,7 @@ export class Renderer {
     const roadLight = concrete ? C.concreteLight : shade(road, 0.1);
 
     // 1. Ondergrond per rij: gras (overkant, start, berm), rijbaan, fietspad of middenberm
-    for (let row = 0; row < ROWS; row++) {
+    for (let row = 0; row < kinds.length; row++) {
       const kind = kinds[row];
       if (kind === 'road' || kind === 'median') {
         ctx.fillStyle = road;
@@ -172,7 +185,7 @@ export class Renderer {
       else ctx.fillRect(0, y, COLS, 0.05);
     };
     ctx.fillStyle = C.line;
-    for (let row = 0; row < ROWS; row++) {
+    for (let row = 0; row < kinds.length; row++) {
       if (kinds[row] !== 'road') continue;
       const above = kinds[row - 1];
       const below = kinds[row + 1];
@@ -184,7 +197,7 @@ export class Renderer {
     }
 
     // 3. Middenberm
-    const m = ROW_MEDIAN;
+    const m = kinds.indexOf('median');
     if (t.median === 'green') {
       // Nederland: groene middenmarkering tussen twee witte lijnen
       ctx.fillStyle = '#3f8a4e';
@@ -225,13 +238,13 @@ export class Renderer {
       ctx.fillRect(0, m + 0.46, COLS, 0.025);
     }
 
-    // 4. In de berm: hectometerpaaltjes (NL) of straatlantaarns (BE)
-    for (let row = 1; row < ROWS - 1; row++) {
-      if (kinds[row] !== 'verge') continue;
-      // Aan de kant van de weg
-      const y = kinds[row + 1] === 'road' || kinds[row + 1] === 'bike' ? row + 0.8 : row + 0.2;
+    // 4. Langs de weg op de overkant en de startberm: hectometerpaaltjes (NL) of straatlantaarns (BE)
+    for (const row of [0, kinds.length - 1]) {
+      // Aan de kant van de weg; op de overkant niet onder het plaatsbord
+      const y = row === 0 ? 0.86 : row + 0.14;
+      const maxX = row === 0 ? 9.4 : COLS;
       if (t.verge === 'hecto') {
-        for (let x = 0.8; x < COLS; x += 3) {
+        for (let x = 0.8; x < maxX; x += 3) {
           ctx.fillStyle = '#2f6b3a';
           ctx.fillRect(x, y - 0.08, 0.14, 0.16);
           ctx.fillStyle = '#ffffff';
@@ -239,7 +252,7 @@ export class Renderer {
         }
       } else if (t.verge === 'lamps') {
         const toward = y > row + 0.5 ? 1 : -1;
-        for (let x = 1.2; x < COLS; x += 3.5) {
+        for (let x = 1.2; x < maxX; x += 3.5) {
           // Paal met een arm naar de weg en een lamp
           ctx.fillStyle = '#4b5563';
           ctx.fillRect(x - 0.05, y - 0.05, 0.1, 0.1);
@@ -366,6 +379,57 @@ export class Renderer {
         this.cow2d(ctx, 6.3, y0 + 0.6);
         break;
       }
+      case 'afsluitdijk': {
+        // Waddenzee achter de dijk, met basaltblokken op het talud
+        ctx.fillStyle = '#5b7f95';
+        ctx.fillRect(0, y0, COLS, 0.26);
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.lineWidth = 0.025;
+        for (let x = 0.3; x < COLS; x += 0.9) {
+          ctx.beginPath();
+          ctx.arc(x, y0 + 0.13 + ((x * 7) % 3) * 0.03, 0.08, Math.PI * 1.1, Math.PI * 1.9);
+          ctx.stroke();
+        }
+        ctx.fillStyle = '#3d4045';
+        ctx.fillRect(0, y0 + 0.26, COLS, 0.1);
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        for (let x = 0; x < COLS; x += 0.22) ctx.fillRect(x, y0 + 0.26, 0.02, 0.1);
+        // Zeilbootje
+        ctx.fillStyle = '#6b4423';
+        ctx.fillRect(6.0, y0 + 0.16, 0.4, 0.07);
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(6.2, y0 + 0.16);
+        ctx.lineTo(6.2, y0 - 0.02);
+        ctx.lineTo(6.42, y0 + 0.16);
+        ctx.closePath();
+        ctx.fill();
+        // Monument op de dijk (van boven: ronde stenen toren)
+        ctx.fillStyle = C.shadow;
+        ctx.beginPath();
+        ctx.arc(2.5, y0 + 0.66, 0.28, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#d8d2c4';
+        ctx.beginPath();
+        ctx.arc(2.45, y0 + 0.6, 0.26, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#9c9484';
+        ctx.lineWidth = 0.04;
+        ctx.beginPath();
+        ctx.arc(2.45, y0 + 0.6, 0.15, 0, Math.PI * 2);
+        ctx.stroke();
+        // IJsselmeer onder de startberm
+        const ys = this.rows - 1;
+        ctx.fillStyle = '#4f7fa0';
+        ctx.fillRect(0, ys + 0.78, COLS, 0.22);
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        for (let x = 0.7; x < COLS; x += 1.1) {
+          ctx.beginPath();
+          ctx.arc(x, ys + 0.9, 0.07, Math.PI * 1.1, Math.PI * 1.9);
+          ctx.stroke();
+        }
+        break;
+      }
       case 'noisewall': {
         // Geluidsscherm langs de snelweg
         ctx.fillStyle = '#7f8f7a';
@@ -456,6 +520,7 @@ export class Renderer {
     for (const lane of game.traffic.lanes) {
       for (const v of lane.vehicles) this.drawVehicle(v, lane);
     }
+    this.drawWrecks(game);
     if (game.mode === 'noncha' && game.state === 'hit' && game.hitBy) this.drawReveal(game);
     if (game.state !== 'ready' && game.state !== 'gameover') this.drawPlayers(game);
     this.drawParticles(game.paused ? 0 : dt);
@@ -529,7 +594,7 @@ export class Renderer {
     const s = this.scale;
     const [ox, oy] = this.shake || [0, 0];
     const mx = 0.15;
-    const my = ROW_MEDIAN + 0.08;
+    const my = game.layout.median + 0.08;
     if (t.speedSign === 'round') {
       // Gewoon verkeersbord
       ctx.save();
@@ -564,13 +629,31 @@ export class Renderer {
     ctx.restore();
   }
 
-  drawVehicle(v, lane) {
+  /**
+   * @param {object} [wreck] wrak na een aanrijding: { x, y, rot, phase, t } (eigen plek en draaiing)
+   */
+  drawVehicle(v, lane, wreck = null) {
     const ctx = this.ctx;
     const L = v.length;
     ctx.save();
-    ctx.translate(v.x + L / 2, lane.row + 0.5);
+    if (wreck) {
+      ctx.translate(wreck.x, wreck.y);
+      ctx.rotate(wreck.rot);
+      if (wreck.phase === 'fade') ctx.globalAlpha = Math.max(0, 1 - wreck.t / 0.6);
+    } else {
+      ctx.translate(v.x + L / 2, lane.row + 0.5);
+    }
     if (lane.dir < 0) ctx.scale(-1, 1); // tekenen alsof hij naar rechts rijdt
     switch (v.type) {
+      case 'dsi':
+        // Zwarte auto met blauwe lichten in de grille
+        this.drawCar(v, L, 0.64, false);
+        this.drawGrilleLights(v, L);
+        break;
+      case 'policemotor':
+        this.drawMotor(v, L);
+        this.drawGrilleLights(v, L * 0.6);
+        break;
       case 'truck':
         this.drawTruck(v, L);
         break;
@@ -609,7 +692,45 @@ export class Renderer {
       default:
         this.drawCar(v, L, 0.62, false);
     }
+    if (wreck && Math.floor((this.time || 0) * 3) % 2 === 0) {
+      // Alarmlichten knipperen (oranje op de hoeken)
+      ctx.fillStyle = '#ffb020';
+      for (const [x, y] of [
+        [L / 2 - 0.08, -0.26],
+        [L / 2 - 0.08, 0.2],
+        [-L / 2, -0.26],
+        [-L / 2, 0.2],
+      ]) {
+        ctx.fillRect(x, y, 0.08, 0.06);
+      }
+    }
     ctx.restore();
+  }
+
+  /** Wrakken na een aanrijding (gedraaid, met alarmlichten). */
+  drawWrecks(game) {
+    for (const w of game.traffic.wrecks) this.drawVehicle(w.v, { dir: w.dir }, w);
+  }
+
+  /** Blauwe flitslichten voorin (DSI, politiemotor). */
+  drawGrilleLights(v, L) {
+    const ctx = this.ctx;
+    const phase = Math.floor((this.time || 0) * 9 + v.x * 0.5) % 2;
+    for (const [side, on] of [
+      [-1, phase === 0],
+      [1, phase === 1],
+    ]) {
+      const x = L / 2 - 0.06;
+      const y = side * 0.16;
+      if (on) {
+        ctx.fillStyle = 'rgba(96, 165, 250, 0.5)';
+        ctx.beginPath();
+        ctx.arc(x, y, 0.22, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = on ? '#dbeafe' : '#1e3a8a';
+      ctx.fillRect(x - 0.04, y - 0.05, 0.08, 0.1);
+    }
   }
 
   /** Sportwagen (Autobahn): laag, breed, met strepen en een spoiler. */

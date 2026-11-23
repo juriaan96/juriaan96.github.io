@@ -45,6 +45,12 @@ export const VEHICLE_TYPES = {
 
 export const EMERGENCY_TYPES = ['fire', 'ambulance', 'police'];
 
+// DSI-colonne: politiemotor voorop, zes zwarte auto's met blauwe lichten, motor achteraan
+VEHICLE_TYPES.dsi = { length: 1.7, speed: 1, colors: ['#0b0c0f'], emergency: true };
+VEHICLE_TYPES.policemotor = { length: 0.85, speed: 1, colors: ['#f5f7fa'], emergency: true };
+export const DSI_CONVOY = ['policemotor', 'dsi', 'dsi', 'dsi', 'dsi', 'dsi', 'dsi', 'policemotor'];
+export const DSI_SPACING = 0.55; // vakjes tussen de voertuigen van de colonne
+
 // Boven deze "maximumsnelheid" wordt de snelweg een Autobahn: geen limiet, betonnen weg en
 // sportwagens op de snelle stroken.
 export const AUTOBAHN_ABOVE = 130;
