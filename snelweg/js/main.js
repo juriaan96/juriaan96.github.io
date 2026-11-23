@@ -17,6 +17,24 @@ import {
   NAME_MAX_LENGTH,
 } from './storage.js';
 
+// --- Noncha: "even kijken" (elke paar seconden kort het speelveld zien) -----------------
+
+const glimpseGroup = document.getElementById('glimpse-group');
+function renderGlimpse() {
+  for (const btn of glimpseGroup.querySelectorAll('[data-glimpse]')) {
+    const checked = Number(btn.dataset.glimpse) === settings.nonchaGlimpse;
+    btn.setAttribute('aria-checked', String(checked));
+    btn.tabIndex = checked ? 0 : -1;
+  }
+}
+glimpseGroup.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-glimpse]');
+  if (!btn) return;
+  settings.nonchaGlimpse = Number(btn.dataset.glimpse);
+  renderGlimpse();
+  trySaveSettings();
+});
+
 const $ = (id) => document.getElementById(id);
 const stage = $('stage');
 const canvas = $('game');
@@ -235,13 +253,17 @@ function focusables(root) {
 
 function focusFirst(root) {
   const el = root.querySelector('[data-autofocus]:not([hidden])') || focusables(root)[0];
-  if (el) el.focus();
+  if (el) el.focus({ preventScroll: true });
+  // Een lang paneel begint bovenaan (titel en uitleg eerst), ook als de focus lager staat.
+  const panel = root.querySelector('.panel');
+  if (panel) panel.scrollTop = 0;
 }
 
 function startGame(mode = 'normal') {
   game.player.look = { ...profile.look };
   game.player.face = profile.face || null;
   game.newGame(mode);
+  game.glimpseEvery = mode === 'noncha' ? settings.nonchaGlimpse : 0;
   show('game');
 }
 
@@ -304,7 +326,10 @@ const actions = {
     customizer.open();
     show('customize');
   },
-  noncha: () => show('noncha'),
+  noncha: () => {
+    renderGlimpse();
+    show('noncha');
+  },
   'noncha-start': () => startGame('noncha'),
   'noncha-test': () => {
     audio.unlock();

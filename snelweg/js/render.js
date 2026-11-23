@@ -164,6 +164,14 @@ export class Renderer {
     if (game.state !== 'ready' && game.state !== 'gameover') this.drawPlayer(game);
     this.drawParticles(game.paused ? 0 : dt);
     this.drawTapMarker(dt);
+
+    // Noncha "even kijken": in- en uitfaden naar zwart
+    const dark = game.darkness;
+    if (dark > 0) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(1, dark)})`;
+      ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
   }
 
   /** Tik-om-te-lopen: kort kringetje op de plek van de tik (in vakjes). */

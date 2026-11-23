@@ -550,6 +550,22 @@ input:focus-visible {
 }
 
 /* Noncha-uitleg */
+.glimpse-field {
+  margin: 0.25rem 0 0.25rem;
+}
+
+.glimpse-field .cz-label {
+  text-align: center;
+}
+
+.glimpse-field .segmented {
+  grid-auto-columns: 1fr;
+}
+
+.glimpse-field .cz-seg {
+  min-width: 0;
+  padding: 0 0.5rem;
+}
 .headphones {
   margin: -0.25rem 0 0.25rem;
   font-size: 2.6rem;

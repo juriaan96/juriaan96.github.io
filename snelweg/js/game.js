@@ -15,6 +15,9 @@ import { Player } from './player.js';
 const HIT_PAUSE = 1.2;
 const NONCHA_REVEAL = 2.0; // noncha: na een aanrijding 2 s het (bevroren) speelveld tonen
 const NONCHA_MULTIPLIER = 3;
+const GLIMPSE_SHOW = 0.5; // noncha "even kijken": zo lang is het speelveld zichtbaar (s)
+const GLIMPSE_FADE_IN = 0.08;
+const GLIMPSE_FADE_OUT = 0.15;
 const LEVEL_CLEAR_PAUSE = 1.6;
 const LEVEL_BANNER = 1.3;
 const MAX_QUEUED_MOVES = 2;
@@ -43,6 +46,8 @@ export class Game {
     this.time = 0;
     this.timer = 0;
     this.crossTime = 0;
+    this.glimpseEvery = 0; // noncha "even kijken": elke zoveel seconden (0 = nooit); main.js zet dit
+    this.glimpseClock = 0;
     this.furthestRow = ROW_START;
     this.moves = [];
     this.hitBy = null;
@@ -60,8 +65,28 @@ export class Game {
   }
 
   /** Noncha: het speelveld is zwart, behalve tijdens de onthulling na een aanrijding. */
+  /**
+   * Noncha: hoe donker het speelveld is (1 = helemaal zwart, 0 = zichtbaar).
+   * Met glimpseEvery > 0 is het veld elke glimpseEvery seconden een halve seconde te zien
+   * ("even kijken"), met een korte fade in en uit. Tijdens de onthulling na een aanrijding
+   * is het altijd zichtbaar.
+   */
+  get darkness() {
+    if (this.mode !== 'noncha' || !this.active || this.state === 'hit') return 0;
+    const every = this.glimpseEvery;
+    if (!every) return 1;
+    const t = this.glimpseClock % every;
+    const start = every - GLIMPSE_SHOW;
+    if (t < start) return 1;
+    const k = t - start;
+    if (k < GLIMPSE_FADE_IN) return 1 - k / GLIMPSE_FADE_IN;
+    if (k > GLIMPSE_SHOW - GLIMPSE_FADE_OUT) return (k - (GLIMPSE_SHOW - GLIMPSE_FADE_OUT)) / GLIMPSE_FADE_OUT;
+    return 0;
+  }
+
+  /** Noncha: het speelveld is helemaal zwart. */
   get blind() {
-    return this.mode === 'noncha' && this.active && this.state !== 'hit';
+    return this.darkness >= 1;
   }
 
   setMessage(message, duration = 0) {
@@ -84,6 +109,7 @@ export class Game {
     this.player.reset();
     this.furthestRow = ROW_START;
     this.crossTime = 0;
+    this.glimpseClock = 0;
     this.moves = [];
     this.hitBy = null;
     this.state = 'playing';
@@ -171,6 +197,7 @@ export class Game {
 
   updatePlaying(dt) {
     this.crossTime += dt;
+    this.glimpseClock += dt;
     if (this.moves.length && this.player.cooldown <= 0) {
       const [dx, dy] = this.moves.shift();
       if (this.player.tryMove(dx, dy)) {

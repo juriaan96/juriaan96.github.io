@@ -79,9 +79,12 @@ function defaultSettings() {
     smartboard: false,
     touchAuto: true,
     smartboardAuto: true,
+    nonchaGlimpse: 4, // noncha: elke zoveel seconden even het speelveld zien (0 = nooit)
     lastName: '',
   };
 }
+
+export const GLIMPSE_OPTIONS = [0, 6, 4, 2];
 
 const BOOLEAN_SETTINGS = ['sound', 'vibrate', 'touchButtons', 'tapToWalk', 'smartboard', 'touchAuto', 'smartboardAuto'];
 
@@ -94,6 +97,7 @@ export function loadSettings() {
     if (typeof data[key] === 'boolean') out[key] = data[key];
   }
   if (Number.isFinite(data.volume)) out.volume = Math.min(1, Math.max(0, data.volume));
+  if (GLIMPSE_OPTIONS.includes(data.nonchaGlimpse)) out.nonchaGlimpse = data.nonchaGlimpse;
   if (typeof data.lastName === 'string') out.lastName = data.lastName.slice(0, NAME_MAX_LENGTH);
   return out;
 }

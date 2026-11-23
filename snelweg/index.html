@@ -86,7 +86,7 @@
 
       <!-- Noncha mode: uitleg -->
       <section id="screen-noncha" class="screen" aria-labelledby="noncha-title" hidden>
-        <div class="panel">
+        <div class="panel wide">
           <h2 id="noncha-title">Noncha mode</h2>
           <p class="headphones" aria-hidden="true">🎧</p>
           <p class="lead"><strong>Zet een koptelefoon op.</strong> Het scherm wordt zwart: je steekt blind over, op je gehoor.</p>
@@ -106,8 +106,18 @@
             Het verkeer rijdt rustiger dan normaal en je hebt 5 levens. Je punten tellen ×3, in een eigen highscorelijst. Na een
             aanrijding zie je 2 seconden wat je raakte.
           </p>
+          <div class="glimpse-field">
+            <span class="cz-label" id="glimpse-label">Even kijken</span>
+            <div class="segmented" role="radiogroup" aria-labelledby="glimpse-label" id="glimpse-group">
+              <button type="button" class="cz-seg" role="radio" aria-checked="false" tabindex="-1" data-glimpse="0">Nooit</button>
+              <button type="button" class="cz-seg" role="radio" aria-checked="false" tabindex="-1" data-glimpse="6">Elke 6 s</button>
+              <button type="button" class="cz-seg" role="radio" aria-checked="false" tabindex="-1" data-glimpse="4">Elke 4 s</button>
+              <button type="button" class="cz-seg" role="radio" aria-checked="false" tabindex="-1" data-glimpse="2">Elke 2 s</button>
+            </div>
+            <p class="privacy">Zo vaak zie je het speelveld een halve seconde. Kies "Nooit" om echt blind te spelen.</p>
+          </div>
           <nav class="menu">
-            <button type="button" class="btn primary" data-action="noncha-start">Start</button>
+            <button type="button" class="btn primary" data-action="noncha-start" data-autofocus>Start</button>
             <button type="button" class="btn" data-action="noncha-test">Test geluid: auto van links naar rechts</button>
             <button type="button" class="btn" data-action="menu">Terug</button>
           </nav>
