@@ -719,6 +719,8 @@ function overview(base) {
   el.innerHTML = `<header><h1>Haardklokken</h1><p>Een klok bij het haardvuur voor elk seizoen. Elke klok telt af naar de eerstvolgende schoolvakantie.</p>
     <p><a class="auto" href="${base}auto/">Open de automatische klok</a> <span class="sub">die kiest zelf de klok die bij vandaag hoort, handig voor een smartboard.</span></p></header>
     <div class="grid">${cards}</div>
+    <section class="extra" aria-labelledby="extra-title"><h2 id="extra-title">Ook op deze site</h2>
+      <p><a class="auto" href="${base}snelweg/">Speel Snelweg Oversteken</a> <span class="sub">een spelletje: steek een drukke Nederlandse snelweg over. Durf je het ook blind, alleen op gehoor?</span></p></section>
     <footer>Vakantiedata: Rijksoverheid, regio Noord (basis- en voortgezet onderwijs). Herfst- en voorjaarsvakantie zijn adviesdata; je eigen school kan afwijken.</footer>`;
   document.body.insertBefore(el, document.body.firstChild);
 }
