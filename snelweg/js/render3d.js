@@ -602,7 +602,14 @@ export class Renderer3D {
       else b.box(XC, 0.01, z, W, 0.004, 0.05, line);
     };
 
-    b.box(XC, -0.2, 0, W, 0.2, 140, grass); // de grond
+    if (t.decor === 'afsluitdijk') {
+      // Afsluitdijk: alleen de dijk zelf is grond; het talud en het water liggen lager (zie buildDecor)
+      const zA = -0.25;
+      const zB = rowKinds(themeId).length + 0.35;
+      b.box(XC, -0.2, (zA + zB) / 2, W, 0.2, zB - zA, grass);
+    } else {
+      b.box(XC, -0.2, 0, W, 0.2, 140, grass); // de grond
+    }
 
     // Per rij: rijbaan, middenberm of fietspad (de rest is gras: overkant, start, berm)
     const kinds = rowKinds(themeId);
@@ -859,18 +866,29 @@ export class Renderer3D {
       }
       case 'afsluitdijk': {
         // Afsluitdijk: Waddenzee achter de overkant (met basalt op het talud), IJsselmeer achter de start
+        // Alles ligt op een eigen hoogte (geen vlakken op dezelfde hoogte, dus geen flikkeren):
+        // dijk (grond, bovenkant 0) → talud in treden omlaag → water op -0.3.
         const wad = rgb('#5b7f95');
         const meer = rgb('#4f7fa0');
         const basalt = rgb('#3d4045');
-        b.box(COLS / 2, -0.06, -0.55, 140, 0.06, 0.5, basalt); // talud
-        for (let x = -20; x < COLS + 20; x += 0.5) b.box(x, -0.005, -0.55, 0.03, 0.006, 0.5, rgb('#55595f'));
-        b.box(COLS / 2, -0.04, -30.8, 140, 0.05, 60, wad); // Waddenzee
-        const z0 = this.rows + 0.45;
-        b.box(COLS / 2, -0.06, z0 + 0.15, 140, 0.06, 0.3, rgb(shade(t.grass, -0.2)));
-        b.box(COLS / 2, -0.04, z0 + 30.3, 140, 0.05, 60, meer); // IJsselmeer
+        const seam = rgb('#55595f');
+        // Waddenzee-kant: basalt in twee treden
+        for (const [z, top] of [
+          [-0.4, -0.08],
+          [-0.7, -0.17],
+        ]) {
+          b.box(COLS / 2, top - 0.25, z, 140, 0.25, 0.3, basalt);
+          for (let x = -20; x < COLS + 20; x += 0.5) b.box(x, top, z, 0.03, 0.004, 0.3, seam);
+        }
+        b.box(COLS / 2, -0.5, -30.85, 140, 0.2, 60.3, wad); // Waddenzee (bovenkant -0.3)
+        // IJsselmeer-kant: grastalud in twee treden
+        const z0 = this.rows + 0.35;
+        b.box(COLS / 2, -0.35, z0 + 0.15, 140, 0.25, 0.3, rgb(shade(t.grass, -0.12))); // bovenkant -0.1
+        b.box(COLS / 2, -0.45, z0 + 0.45, 140, 0.25, 0.3, rgb(shade(t.grass, -0.25))); // bovenkant -0.2
+        b.box(COLS / 2, -0.5, z0 + 30.6, 140, 0.2, 60, meer); // IJsselmeer (bovenkant -0.3)
         // Het monument: stenen uitkijktoren
         const stone = rgb('#d8d2c4');
-        b.box(2.6, 0, -0.15, 0.8, 1.6, 0.8, stone, Math.PI / 4);
+        b.box(2.6, -0.3, -0.15, 0.8, 1.9, 0.8, stone, Math.PI / 4); // voet reikt tot in het talud
         b.box(2.6, 1.6, -0.15, 0.95, 0.12, 0.95, rgb('#b9b1a0'), Math.PI / 4);
         b.box(2.6, 1.72, -0.15, 0.5, 0.35, 0.5, stone, Math.PI / 4);
         b.box(2.6, 0.4, 0.27, 0.22, 0.5, 0.02, rgb('#2b2b2b'), 0); // deur
@@ -907,9 +925,10 @@ export class Renderer3D {
       [-0.25, -2.6, 9, '#e63946'],
     ]) {
       const x = ((((this.time * speed + offset) % 40) + 40) % 40) - 13;
-      b.box(x, -0.02, z, 0.9, 0.18, 0.32, hull);
-      b.box(x, 0.16, z, 0.04, 1.0, 0.04, white); // mast
-      b.box(x + 0.22 * Math.sign(speed), 0.24, z, 0.4, 0.8, 0.02, rgb(sail)); // zeil
+      // Op het water (bovenkant -0.3)
+      b.box(x, -0.34, z, 0.9, 0.18, 0.32, hull);
+      b.box(x, -0.16, z, 0.04, 1.0, 0.04, white); // mast
+      b.box(x + 0.22 * Math.sign(speed), -0.08, z, 0.4, 0.8, 0.02, rgb(sail)); // zeil
     }
   }
 

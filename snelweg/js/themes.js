@@ -123,7 +123,7 @@ export const THEMES = {
     placeSign: 'nl-anwb',
     flag: 'nl',
     scenery: 'none',
-    places: ['Leeuwarden', 'Harlingen', 'Bolsward', 'Franeker', 'Sneek', 'Kornwerderzand', 'Zurich', 'Den Oever', 'Den Helder', 'Wieringerwerf'],
+    places: ['Den Oever', 'Afsluitdijk', 'Kornwerderzand'],
   },
   de: {
     label: 'Autobahn',
