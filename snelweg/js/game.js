@@ -28,7 +28,10 @@ const DUEL_HIT_PAUSE = 1.0; // samen spelen: zo lang ligt een geraakte speler pl
 const DUEL_WIN_PAUSE = 1.8; // feestje voordat het winnaarsscherm komt
 const DUEL_START_COLS = [3, 9];
 // Zware voertuigen drukken je plat; lichte laten je wegtollen
-const HEAVY = ['truck', 'van', 'fire', 'ambulance', 'tractor'];
+const HEAVY = ['truck', 'van', 'fire', 'ambulance', 'tractor', 'blade', 'werkwagen', 'pijlwagen'];
+const ITEMS_PER_LEVEL = 3; // spulletjes om te verzamelen per level
+const ITEM_POINTS = 25; // × level
+const WEATHER_NAMES = { rain: 'regen', fog: 'mist', night: 'nacht' };
 export const MAX_LEVEL = 30;
 
 /**
@@ -72,6 +75,7 @@ export class Game {
     this.messageTimer = 0;
     this.traffic.reset(1);
     this.place = pickPlace(this.params.theme); // plaats aan de overkant (wisselt per level)
+    this.items = []; // spulletjes om te verzamelen (zie placeItems)
   }
 
   /** Indeling van het speelveld (rijen, middenberm, start) voor dit level. */
@@ -161,31 +165,83 @@ export class Game {
     this.glimpseClock = 0;
     this.moves = [];
     this.hitBy = null;
+    this.placeItems();
     this.state = 'playing';
-    this.setMessage(this.levelMessage(), LEVEL_BANNER);
+    this.setMessage(this.levelMessage(), this.params.boss ? LEVEL_BANNER + 0.9 : LEVEL_BANNER + (this.extrasText() ? 0.5 : 0));
     this.onEvent('levelstart', { level: this.level });
   }
 
+  /** Wat er dit level bijzonder is (weer, wegwerkzaamheden, file), voor de melding. */
+  extrasText() {
+    const parts = [];
+    if (this.params.event === 'works') parts.push('Wegwerkzaamheden');
+    if (this.params.event === 'jam') parts.push('Spitsfile: steek over als het stilstaat');
+    if (WEATHER_NAMES[this.params.weather]) parts.push(WEATHER_NAMES[this.params.weather][0].toUpperCase() + WEATHER_NAMES[this.params.weather].slice(1));
+    return parts.join(' · ');
+  }
+
   levelMessage() {
+    const extras = this.extrasText();
+    const add = (text) => (extras ? `${text} · ${extras}` : text);
     if (this.mode === 'duel') {
       return {
         title: 'Klaar? Lopen!',
-        text: `Wie het eerst aan de overkant is, wint${this.params.autobahn ? ' · Autobahn!' : ''}`,
+        text: add(`Wie het eerst aan de overkant is, wint${this.params.autobahn ? ' · Autobahn!' : ''}`),
         toast: true,
       };
+    }
+    if (this.params.boss === 'transport') {
+      return { title: 'Eindbaas: exceptioneel transport!', text: add('Pas op voor de lange windmolenwieken'), toast: true };
+    }
+    if (this.params.boss === 'circuit') {
+      return { title: `Eindbaas: circuit ${this.place}!`, text: add('Raceauto’s, allemaal dezelfde kant op'), toast: true };
     }
     if (!this.params.autobahn) {
       return {
         title: `Level ${this.level}`,
-        text: `${this.theme.label} · maximaal ${this.params.speedLimit} km/u · naar ${this.place}`,
+        text: add(`${this.theme.label} · maximaal ${this.params.speedLimit} km/u · naar ${this.place}`),
         toast: true,
       };
     }
     // Eerste level boven de limiet: welkom op de Autobahn
     const first = this.level <= 1 || !levelParams(this.level - 1, this.mode).autobahn;
     return first
-      ? { title: 'Welkom op de Autobahn!', text: `Level ${this.level} · geen snelheidslimiet · naar ${this.place}`, toast: true }
-      : { title: `Level ${this.level}`, text: `Autobahn · geen snelheidslimiet · naar ${this.place}`, toast: true };
+      ? { title: 'Welkom op de Autobahn!', text: add(`Level ${this.level} · geen snelheidslimiet · naar ${this.place}`), toast: true }
+      : { title: `Level ${this.level}`, text: add(`Autobahn · geen snelheidslimiet · naar ${this.place}`), toast: true };
+  }
+
+  // --- Verzamelen ------------------------------------------------------------
+
+  /** Spulletjes van dit land op willekeurige plekken op de weg (niet op de bermen). */
+  placeItems() {
+    this.items = [];
+    const item = this.theme.item;
+    if (!item) return;
+    const rows = [];
+    this.layout.kinds.forEach((k, r) => {
+      if (k === 'road' || k === 'bike' || k === 'median') rows.push(r);
+    });
+    const used = new Set();
+    for (let i = 0; i < ITEMS_PER_LEVEL && rows.length; i++) {
+      for (let tries = 0; tries < 20; tries++) {
+        const row = rows[Math.floor(Math.random() * rows.length)];
+        const col = 1 + Math.floor(Math.random() * 11);
+        if (used.has(`${col},${row}`)) continue;
+        used.add(`${col},${row}`);
+        this.items.push({ type: item, col, row, t: Math.random() * 6 });
+        break;
+      }
+    }
+  }
+
+  /** Staat speler p op een spulletje? Dan oppakken (punten + verzameling, zie main.js). */
+  pickUp(p, who = 0) {
+    const i = this.items.findIndex((it) => it.col === p.col && it.row === p.row);
+    if (i === -1) return;
+    const [it] = this.items.splice(i, 1);
+    const points = ITEM_POINTS * this.level * this.multiplier;
+    if (this.mode !== 'duel') this.score += points;
+    this.onEvent('collect', { item: it.type, points, player: who, x: it.col + 0.5 });
   }
 
   // --- Invoer -------------------------------------------------------------
@@ -302,6 +358,7 @@ export class Game {
         if (row === this.layout.median) this.onEvent('median');
         else if (row === this.layout.start && dy > 0) this.onEvent('start');
         else if (row !== ROW_FINISH) this.onEvent('step');
+        this.pickUp(this.player);
       } else if (this.player.cooldown <= 0) {
         this.onEvent('blocked');
       }
@@ -340,6 +397,7 @@ export class Game {
         if (p.tryMove(dx, dy)) {
           if (p.row === this.layout.median) this.onEvent('median', { player: i });
           else if (p.row !== ROW_FINISH) this.onEvent('step', { player: i });
+          this.pickUp(p, i);
         } else {
           this.onEvent('blocked', { player: i });
         }

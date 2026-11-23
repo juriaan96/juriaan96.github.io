@@ -6,6 +6,7 @@
 // MIGRATIONS, zodat oude data blijft werken.
 
 import { cleanLook, isFaceDataUrl, DEFAULT_LOOK } from './character.js';
+import { ITEMS } from './themes.js';
 
 const PREFIX = 'snelweg-oversteken:';
 const VERSION = 1;
@@ -25,6 +26,7 @@ const MIGRATIONS = {
   settings: {},
   highscores: {},
   profiles: {},
+  collection: {},
 };
 
 function isQuotaError(e) {
@@ -186,6 +188,31 @@ export function deleteProfile(id) {
   if (!profiles.list.some((p) => p.id === profiles.activeId)) profiles.activeId = profiles.list[0].id;
   saveProfiles(profiles);
   return profiles;
+}
+
+// --- Verzameling --------------------------------------------------------------
+// { tulp: 3, friet: 1, … }: hoeveel je van elk spulletje hebt opgepakt (voor nieuwe poppetjes).
+
+export function loadCollection() {
+  const data = readRaw('collection');
+  const out = {};
+  if (!data || typeof data !== 'object') return out;
+  for (const key of Object.keys(ITEMS)) {
+    if (Number.isInteger(data[key]) && data[key] > 0) out[key] = Math.min(data[key], 99999);
+  }
+  return out;
+}
+
+/** Eén spulletje erbij; geeft het nieuwe aantal terug (ook als opslaan niet lukt). */
+export function addToCollection(item) {
+  const collection = loadCollection();
+  collection[item] = (collection[item] || 0) + 1;
+  try {
+    writeRaw('collection', collection);
+  } catch (e) {
+    // opslag vol of geblokkeerd: dan telt het alleen dit spel
+  }
+  return collection[item];
 }
 
 // --- Highscores -------------------------------------------------------------

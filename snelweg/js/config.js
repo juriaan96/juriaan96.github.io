@@ -45,6 +45,29 @@ export const VEHICLE_TYPES = {
 
 export const EMERGENCY_TYPES = ['fire', 'ambulance', 'police'];
 
+// Wegwerkzaamheden: werkwagen met een pijlwagen erachter (rijden samen, langzaam)
+VEHICLE_TYPES.werkwagen = { length: 1.8, speed: 1, colors: ['#ffc20e'], follow: 'pijlwagen' };
+VEHICLE_TYPES.pijlwagen = { length: 1.6, speed: 1, colors: ['#ffc20e'] };
+// Eindbaas: exceptioneel transport (een windmolenwiek) met begeleidingsauto's
+VEHICLE_TYPES.blade = { length: 12, speed: 1, colors: ['#e5e7eb'] };
+VEHICLE_TYPES.begeleider = { length: 1.5, speed: 1, colors: ['#ffd60a'] };
+// Eindbaas: raceauto's op het circuit
+VEHICLE_TYPES.f1 = { length: 1.6, speed: 1.5, colors: ['#dc2626', '#f97316', '#1d4ed8', '#16a34a', '#facc15', '#e5e7eb', '#111827', '#0ea5e9'] };
+export const TRANSPORT_CONVOY = ['begeleider', 'blade', 'begeleider'];
+
+/**
+ * Wat er extra gebeurt in een level (alleen uiterlijk en verkeer, zie traffic.js en de renderers):
+ * - boss:    elk vijfde level een eindbaas: 'transport' (5, 15, 25 …) of 'circuit' (10, 20, 30 …)
+ * - weather: vanaf level 8 wisselend 'rain', 'fog', 'night', 'clear'
+ * - event:   vanaf level 8 soms 'works' (wegwerkzaamheden) of 'jam' (spitsfile), niet bij een eindbaas
+ */
+export function levelExtras(level) {
+  const boss = level % 5 === 0 ? (level % 10 === 0 ? 'circuit' : 'transport') : '';
+  const weather = level >= 8 ? ['rain', 'fog', 'night', 'clear'][(level - 8) % 4] : 'clear';
+  const event = !boss && level >= 8 ? ['works', 'jam', ''][level % 3] : '';
+  return { boss, weather, event };
+}
+
 // DSI-colonne: politiemotor voorop, zes zwarte auto's met blauwe lichten, motor achteraan
 VEHICLE_TYPES.dsi = { length: 1.7, speed: 1, colors: ['#0b0c0f'], emergency: true };
 VEHICLE_TYPES.policemotor = { length: 0.85, speed: 1, colors: ['#f5f7fa'], emergency: true };
@@ -79,7 +102,7 @@ export function levelParams(level, mode = 'normal') {
     // Blind oversteken: rustiger verkeer, ruimere gaten (minstens 1,4 s, standaard 2 s) en
     // de moeilijkheid stijgt maar half zo snel per level.
     const n = Math.max(0, level - 1) * 0.5;
-    return withAutobahn({
+    return withAutobahn(level, {
       baseSpeed: Math.min(1.5 + 0.3 * n, 4.0),
       minGapTime: Math.max(2.0 - 0.06 * n, 1.4),
       maxGapTime: Math.max(4.2 - 0.2 * n, 2.6),
@@ -87,7 +110,7 @@ export function levelParams(level, mode = 'normal') {
     });
   }
   const n = Math.max(0, level - 1);
-  return withAutobahn({
+  return withAutobahn(level, {
     baseSpeed: Math.min(2.0 + 0.4 * n, 6.0),
     minGapTime: Math.max(1.4 - 0.07 * n, 0.9),
     maxGapTime: Math.max(3.4 - 0.25 * n, 1.7),
@@ -95,9 +118,11 @@ export function levelParams(level, mode = 'normal') {
   });
 }
 
-function withAutobahn(params) {
-  // theme: soort weg (zie themes.js), alleen voor het uiterlijk
-  return { ...params, autobahn: params.speedLimit > AUTOBAHN_ABOVE, theme: themeIdFor(params.speedLimit) };
+function withAutobahn(level, params) {
+  // theme: soort weg (zie themes.js); bij de eindbaas "circuit" een racecircuit
+  const extras = levelExtras(level);
+  const theme = extras.boss === 'circuit' ? 'circuit' : themeIdFor(params.speedLimit);
+  return { ...params, ...extras, theme, autobahn: theme === 'de' };
 }
 
 // Score

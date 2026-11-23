@@ -13,7 +13,23 @@ export const BASES = {
   mei: { name: 'Mei', skin: '#f6d1a4', hair: '#151515', hairStyle: 'bun' },
   henk: { name: 'Opa Henk', skin: '#f3d3b5', hair: '#d4d4d4', hairStyle: 'short', glasses: true },
   robot: { name: 'Robot', skin: '#b8c4d0', hair: '#5b6b7a', hairStyle: 'antenna', square: true, eyes: '#39d0ff' },
+  // Vrij te spelen door spulletjes te verzamelen (unlock: welk spulletje en hoeveel)
+  tulpje: { name: 'Tulpje', skin: '#ffdbac', hair: '#e63946', hairStyle: 'long', unlock: { item: 'tulp', count: 5 } },
+  klaas: { name: 'Boer Klaas', skin: '#f1c27d', hair: '#c8a165', hairStyle: 'short', beard: true, unlock: { item: 'klomp', count: 5 } },
+  wafelien: { name: 'Wafelien', skin: '#e0ac69', hair: '#8b5a2b', hairStyle: 'bun', unlock: { item: 'stroopwafel', count: 5 } },
+  frits: { name: 'Frits', skin: '#f1c27d', hair: '#ffd60a', hairStyle: 'curly', unlock: { item: 'friet', count: 5 } },
+  amelie: { name: 'Amélie', skin: '#f6d1a4', hair: '#1b1b1b', hairStyle: 'bun', glasses: true, unlock: { item: 'croissant', count: 5 } },
+  heidi: { name: 'Heidi', skin: '#ffe0bd', hair: '#f2c94c', hairStyle: 'long', unlock: { item: 'kaas', count: 5 } },
+  hans: { name: 'Hans', skin: '#e8b48a', hair: '#6b3e1e', hairStyle: 'short', beard: true, unlock: { item: 'brezel', count: 5 } },
+  coureur: { name: 'Coureur', skin: '#d9a066', hair: '#222222', hairStyle: 'short', glasses: true, unlock: { item: 'trofee', count: 3 } },
 };
+
+/** Is dit poppetje vrijgespeeld? (Poppetjes zonder unlock zijn er altijd.) */
+export function isBaseUnlocked(baseId, collection = {}) {
+  const base = BASES[baseId];
+  if (!base || !base.unlock) return true;
+  return (collection[base.unlock.item] || 0) >= base.unlock.count;
+}
 
 export const HATS = [
   { id: 'none', name: 'Geen' },
@@ -74,7 +90,7 @@ export function cleanLook(look) {
 export function randomLook(rng = Math.random) {
   const pick = (arr) => arr[Math.floor(rng() * arr.length)];
   return {
-    base: pick(Object.keys(BASES)),
+    base: pick(Object.keys(BASES).filter((id) => !BASES[id].unlock)), // alleen poppetjes die er altijd zijn
     shirt: pick(SHIRT_COLORS)[0],
     pants: pick(PANTS_COLORS)[0],
     hat: pick(HATS).id,

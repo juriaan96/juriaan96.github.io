@@ -1,7 +1,8 @@
 import { Game, MAX_LEVEL } from './game.js';
 import { Renderer } from './render.js';
 import { Renderer3D } from './render3d.js';
-import { rowKinds } from './themes.js';
+import { rowKinds, ITEMS } from './themes.js';
+import { BASES } from './character.js';
 import { Input } from './input.js';
 import { createAvatar } from './character.js';
 import { Customizer, displayName } from './customizer.js';
@@ -17,6 +18,7 @@ import {
   loadProfiles,
   StorageError,
   NAME_MAX_LENGTH,
+  addToCollection,
 } from './storage.js';
 
 // --- Noncha: "even kijken" (elke paar seconden kort het speelveld zien) -----------------
@@ -86,7 +88,7 @@ for (const type of ['pointerdown', 'keydown']) {
 
 // --- Geluid, trillen en meldingen bij spelgebeurtenissen ---------------------------
 
-const VEHICLE_NAMES = { car: 'een auto', van: 'een bestelbus', truck: 'een vrachtwagen', motor: 'een motor', sport: 'een sportwagen', fire: 'de brandweer', ambulance: 'een ambulance', police: 'de politie', tractor: 'een trekker', bike: 'een fietser', bakfiets: 'een bakfiets', scooter: 'een snorfiets', dsi: 'de DSI', policemotor: 'een politiemotor' };
+const VEHICLE_NAMES = { car: 'een auto', van: 'een bestelbus', truck: 'een vrachtwagen', motor: 'een motor', sport: 'een sportwagen', fire: 'de brandweer', ambulance: 'een ambulance', police: 'de politie', tractor: 'een trekker', bike: 'een fietser', bakfiets: 'een bakfiets', scooter: 'een snorfiets', dsi: 'de DSI', policemotor: 'een politiemotor', werkwagen: 'een werkwagen', pijlwagen: 'een pijlwagen', blade: 'het exceptioneel transport', begeleider: 'een begeleidingsauto', f1: 'een raceauto' };
 /** Naam van een rij voor schermlezers; hangt af van het wegtype (fietspad, berm, rijstrook n). */
 function rowName(row) {
   const kinds = rowKinds(game.params.theme);
@@ -130,6 +132,10 @@ function onGameEvent(type, data = {}) {
     announce('Ongeluk! Pas op, er tollen auto’s over de weg.');
     vibrate([60, 40, 120]);
   }
+  if (type === 'collect') onCollect(data);
+  if (type === 'jamstop') announce('De file staat stil: nu oversteken!');
+  if (type === 'jamgo') announce('Het verkeer trekt weer op.');
+  if (type === 'transport') announce('Exceptioneel transport komt eraan.');
   if (game.mode === 'duel') {
     onDuelEvent(type, who, data);
     return;
@@ -169,6 +175,22 @@ function onGameEvent(type, data = {}) {
   }
 }
 
+/** Spulletje opgepakt: bewaren, melden, en misschien een nieuw poppetje vrijgespeeld. */
+function onCollect({ item, points }) {
+  const count = addToCollection(item);
+  const words = ITEMS[item] || [item, item];
+  const unlocked = Object.keys(BASES).find((id) => BASES[id].unlock && BASES[id].unlock.item === item && BASES[id].unlock.count === count);
+  if (unlocked) {
+    game.setMessage({ title: `Nieuw poppetje: ${BASES[unlocked].name}!`, text: `Kies het bij Poppetje maken (${count} ${words[1]} verzameld)`, toast: true }, 2.2);
+    announce(`Nieuw poppetje vrijgespeeld: ${BASES[unlocked].name}!`);
+    audio.play('finish');
+  } else {
+    const msg = `${count} ${count === 1 ? words[0] : words[1]} verzameld`;
+    if (game.mode !== 'duel') game.setMessage({ title: `+${points} · ${words[0]}!`, text: msg, toast: true }, 1.1);
+    announce(`${words[0]}! ${msg}.`);
+  }
+}
+
 function where() {
   if (!game.active) return;
   const p = game.player;
@@ -188,6 +210,7 @@ function updateAudio() {
   const row = ps.reduce((s, p) => s + p.row, 0) / ps.length;
   const level = ENGINE_LEVEL[game.mode] || ENGINE_LEVEL.normal;
   audio.updateTraffic(game.traffic, playing ? { x, row: Math.round(row) } : null, playing ? level : 0);
+  audio.setWeather(playing ? game.params.weather : '');
 }
 
 /**

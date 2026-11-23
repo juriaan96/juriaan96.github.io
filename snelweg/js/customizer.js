@@ -16,13 +16,16 @@ import {
   randomLook,
   paintAvatar,
   paintFull,
+  isBaseUnlocked,
 } from './character.js';
+import { ITEMS } from './themes.js';
 import {
   loadProfiles,
   saveProfile,
   deleteProfile,
   newProfile,
   StorageError,
+  loadCollection,
   MAX_PROFILES,
   NAME_MAX_LENGTH,
 } from './storage.js';
@@ -201,6 +204,15 @@ export class Customizer {
   }
 
   setLook(key, value) {
+    if (key === 'base' && !isBaseUnlocked(value, loadCollection())) {
+      // Nog niet vrijgespeeld: zeggen hoeveel je nog moet verzamelen
+      const { unlock, name } = BASES[value];
+      const have = loadCollection()[unlock.item] || 0;
+      const words = ITEMS[unlock.item] || [unlock.item, unlock.item];
+      const left = unlock.count - have;
+      this.setStatus(`🔒 ${name}: verzamel nog ${left} ${left === 1 ? words[0] : words[1]} om dit poppetje vrij te spelen.`);
+      return;
+    }
     this.profile.look = { ...this.profile.look, [key]: value };
     this.save();
     this.update();
@@ -323,8 +335,17 @@ export class Customizer {
     this.root.querySelector('[data-cz="photo"]').textContent = profile.face ? 'Andere foto' : 'Foto kiezen';
 
     paintFull(this.preview, look, profile.face);
+    const collection = loadCollection();
     for (const { id, canvas } of this.baseCanvases) {
       paintAvatar(canvas, { ...look, base: id });
+      // Nog niet vrijgespeeld: grijs met een slotje
+      const btn = canvas.parentElement;
+      const locked = !isBaseUnlocked(id, collection);
+      btn.classList.toggle('locked', locked);
+      const { unlock, name } = BASES[id];
+      const label = locked ? `${name} (op slot: verzamel ${unlock.count} ${(ITEMS[unlock.item] || [])[1] || unlock.item})` : name;
+      btn.setAttribute('aria-label', label);
+      btn.title = label;
     }
     this.preview.setAttribute(
       'aria-label',

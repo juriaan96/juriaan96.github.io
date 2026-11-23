@@ -20,7 +20,7 @@ import { COLS, ROWS } from './config.js';
 import { drawCharacter } from './character.js';
 import { PLAYER_COLORS, shade } from './render.js';
 import { THEMES, rowKinds } from './themes.js';
-import { paintUnlimited, paintRoundSign, paintPlaceSign, FLAGS } from './signs.js';
+import { paintUnlimited, paintRoundSign, paintPlaceSign, paintCheckered, paintItem, FLAGS } from './signs.js';
 
 // Camera kijkt zo schuin naar beneden: liggend schuin, staand (telefoon) steiler, zodat het
 // smalle scherm beter gevuld wordt.
@@ -145,12 +145,18 @@ const IDENTITY = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 
 
 // --- Shaders --------------------------------------------------------------------------
 
+// Nevel opzij en in de verte, plus (mist/nacht) nevel rond de speler: je ziet alleen vlakbij.
 const FOG_GLSL = `
 uniform vec3 uFogColor;
+uniform vec2 uPlayer;
+uniform vec2 uLocalFog;
+uniform float uLocalMax;
+uniform float uBright;
 float fogAt(vec3 p) {
   float side = smoothstep(7.2, 12.0, abs(p.x - 6.5));
   float far = smoothstep(2.0, 26.0, -p.z) * 0.9;
-  return max(side, far);
+  float local = smoothstep(uLocalFog.x, uLocalFog.y, distance(p.xz, uPlayer)) * uLocalMax;
+  return max(max(side, far), local);
 }`;
 
 const LIT_VS = `
@@ -175,7 +181,7 @@ varying vec3 vWorld;
 uniform float uAlpha;
 ${FOG_GLSL}
 void main() {
-  gl_FragColor = vec4(mix(vColor, uFogColor, fogAt(vWorld)), uAlpha);
+  gl_FragColor = vec4(mix(vColor * uBright, uFogColor, fogAt(vWorld)), uAlpha);
 }`;
 
 const TEX_VS = `
@@ -201,7 +207,7 @@ ${FOG_GLSL}
 void main() {
   vec4 c = texture2D(uTex, vUV) * uColor;
   if (c.a < 0.03) discard;
-  c.rgb = mix(c.rgb, uFogColor, fogAt(vWorld) * uFog);
+  c.rgb = mix(c.rgb * mix(1.0, uBright, uFog), uFogColor, fogAt(vWorld) * uFog);
   gl_FragColor = c;
 }`;
 
@@ -555,6 +561,12 @@ export class Renderer3D {
   speedSign(limit) {
     return this.canvasTex(`speed:${limit}`, 128, 128, (ctx) => {
       const key = String(limit);
+      if (key.indexOf('checkered') === 0) {
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, 128, 128);
+        paintCheckered(ctx, 14, 24, 100, 80, 5, 4); // circuit
+        return;
+      }
       if (key.indexOf('round:') === 0) {
         paintRoundSign(ctx, 64, 64, 60, key.slice(6)); // gewoon verkeersbord (doorzichtige hoeken)
         return;
@@ -598,6 +610,11 @@ export class Renderer3D {
     const post = rgb('#5b6068');
     // Kantstreep: doorgetrokken of onderbroken
     const edgeLine = (z) => {
+      if (t.edge === 'curbs') {
+        // Circuit: rood-witte curbs
+        for (let x = -20, i = 0; x < COLS + 20; x += 0.5, i++) b.box(x + 0.25, 0.01, z, 0.5, 0.025, 0.16, rgb(i % 2 ? '#ffffff' : '#d62828'));
+        return;
+      }
       if (t.edge === 'dashed') for (let x = -20; x < COLS + 20; x += 1.0) b.box(x + 0.28, 0.01, z, 0.55, 0.004, 0.05, line);
       else b.box(XC, 0.01, z, W, 0.004, 0.05, line);
     };
@@ -661,7 +678,13 @@ export class Renderer3D {
     }
 
     // Middenberm
-    if (t.median === 'green') {
+    if (t.median === 'pitwall') {
+      // Circuit: muur langs de pitstraat met een hek erop
+      b.box(XC, 0, railZ + 0.05, W, 0.55, 0.22, rgb('#d4d4cf'));
+      b.box(XC, 0.25, railZ + 0.17, W, 0.08, 0.01, rgb('#d62828'));
+      for (let x = -14.8; x < COLS + 15; x += 0.8) b.box(x, 0.55, railZ + 0.05, 0.04, 0.6, 0.04, post);
+      b.box(XC, 1.12, railZ + 0.05, W, 0.04, 0.04, post);
+    } else if (t.median === 'green') {
       // Nederland: groene middenmarkering tussen twee witte lijnen
       b.box(XC, 0.01, median + 0.5, W, 0.004, 0.44, rgb('#3f8a4e'));
       b.box(XC, 0.011, median + 0.25, W, 0.004, 0.06, line);
@@ -754,7 +777,9 @@ export class Renderer3D {
       const fh = 0.4;
       const fy = 1.3;
       const x0 = fx - 0.3;
-      if (flag.dir === 'cross') {
+      if (flag.dir === 'checker') {
+        for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) b.box(x0 + (c + 0.5) * (fw / 4), fy + r * (fh / 3), fz, fw / 4, fh / 3, 0.03, rgb((r + c) % 2 ? '#ffffff' : '#111111'));
+      } else if (flag.dir === 'cross') {
         b.box(x0 + fw / 2, fy, fz, fw, fh, 0.03, rgb(flag.colors[0]));
         b.box(x0 + fw / 2, fy + 0.07, fz + 0.02, 0.07, fh - 0.14, 0.01, rgb(flag.colors[1]));
         b.box(x0 + fw / 2, fy + fh / 2 - 0.035, fz + 0.02, fh - 0.14, 0.07, 0.01, rgb(flag.colors[1]));
@@ -769,6 +794,13 @@ export class Renderer3D {
     // Snelheidsbord (matrixbord of gewoon bord op een paal) en plaatsbord op de overkant
     b.box(0.6, 0, 0.3, 0.08, 1.2, 0.08, post);
     if (t.speedSign !== 'round') b.box(0.6, 1.1, 0.3, 0.9, 0.9, 0.1, rgb('#111111'));
+    // Circuit: geblokte start/finishlijn dwars over de baan
+    if (t.edge === 'curbs') {
+      kinds.forEach((k, row) => {
+        if (k !== 'road') return;
+        for (let r = 0; r < 5; r++) for (let c = 0; c < 2; c++) b.box(6.4 + c * 0.2, 0.012, row + 0.1 + r * 0.2, 0.2, 0.003, 0.2, rgb((r + c) % 2 ? '#ffffff' : '#111111'));
+      });
+    }
     b.box(COLS - 2.3, 0, 0.3, 0.08, 1.0, 0.08, post);
     b.box(COLS - 0.7, 0, 0.3, 0.08, 1.0, 0.08, post);
     b.box(COLS - 1.5, 0.9, 0.3, 2.4, 0.76, 0.06, rgb('#d9dde2'));
@@ -894,6 +926,19 @@ export class Renderer3D {
         b.box(2.6, 0.4, 0.27, 0.22, 0.5, 0.02, rgb('#2b2b2b'), 0); // deur
         break;
       }
+      case 'grandstand': {
+        // Circuit: tribune vol publiek, met een dak
+        const grey = rgb('#8a9099');
+        const crowd = ['#e63946', '#ffd60a', '#1d4ed8', '#ffffff', '#f77f00', '#2a9d8f'].map(rgb);
+        for (let k = 0; k < 4; k++) {
+          const z = -0.6 - k * 0.45;
+          b.box(5, 0, z, 9, (k + 1) * 0.35, 0.45, grey);
+          for (let x = 0.75; x < 9.3; x += 0.3) b.box(x, (k + 1) * 0.35, z, 0.18, 0.22, 0.14, crowd[Math.floor(rnd() * crowd.length)]);
+        }
+        for (const x of [0.6, 9.4]) b.box(x, 0, -2.2, 0.1, 2.3, 0.1, post);
+        b.box(5, 2.3, -1.5, 9.4, 0.08, 2.2, rgb('#eceff1'));
+        break;
+      }
       case 'noisewall': {
         // Geluidsscherm langs de snelweg
         const panel = rgb('#7f8f7a');
@@ -913,6 +958,93 @@ export class Renderer3D {
       }
       default:
         break;
+    }
+  }
+
+  /** Wegwerkzaamheden: pionnen en gele strepen langs de afgezette rijstrook. */
+  addWorks(b, game) {
+    const orange = rgb('#f97316');
+    const white = rgb('#ffffff');
+    const yellow = rgb('#ffc20e');
+    for (const lane of game.traffic.lanes) {
+      if (lane.kind !== 'work') continue;
+      for (const z of [lane.row + 0.06, lane.row + 0.94]) b.box(COLS / 2, 0.011, z, 60, 0.003, 0.06, yellow);
+      for (let x = -7.5; x < COLS + 8; x += 1) {
+        for (const z of [lane.row + 0.13, lane.row + 0.87]) {
+          b.box(x, 0, z, 0.24, 0.04, 0.24, orange);
+          b.box(x, 0.04, z, 0.13, 0.3, 0.13, orange);
+          b.box(x, 0.17, z, 0.145, 0.06, 0.145, white);
+        }
+      }
+    }
+  }
+
+  /** Nacht: lichtbundels van koplampen op de weg en een lichtkring om je poppetje. */
+  drawLightPools(game, prog) {
+    const gl = this.gl;
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // licht optellen
+    this.useTex(this.vp, 0);
+    const R = [1, 0, 0];
+    const U = [0, 0, -1];
+    for (const lane of game.traffic.lanes) {
+      for (const v of lane.vehicles) {
+        if (v.x + v.length < -6 || v.x > COLS + 6) continue;
+        const front = lane.dir > 0 ? v.x + v.length : v.x;
+        this.quads.add([front + lane.dir * 1.0, 0.02, lane.row + 0.5], R, U, 2.3, 0.95);
+      }
+    }
+    if (game.state !== 'ready' && game.state !== 'gameover') {
+      for (const p of game.players) this.quads.add([p.col + 0.5, 0.025, p.row + 0.5], R, U, 1.9, 1.9);
+    }
+    this.drawQuads(prog, this.beam, [1, 1, 1, 0.75]);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    this.useTex(this.vp, 1);
+  }
+
+  get beam() {
+    return this.canvasTex('beam', 64, 64, (ctx) => {
+      const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 32);
+      g.addColorStop(0, 'rgba(255, 236, 170, 0.9)');
+      g.addColorStop(0.5, 'rgba(255, 220, 140, 0.35)');
+      g.addColorStop(1, 'rgba(255, 210, 120, 0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 64, 64);
+    });
+  }
+
+  /** Regen: neerkletterende strepen over het hele beeld (en iets donkerder). */
+  drawRain(prog) {
+    this.useTex(IDENTITY, 0);
+    this.quads.add([0, 0, 0], [1, 0, 0], [0, 1, 0], 2, 2);
+    this.drawQuads(prog, this.white, [0.2, 0.28, 0.4, 0.16]);
+    const streaks = this.canvasTex('rain', 128, 128, (ctx) => {
+      ctx.strokeStyle = 'rgba(225, 235, 255, 0.7)';
+      ctx.lineWidth = 1.4;
+      for (let i = 0; i < 46; i++) {
+        const x = (i * 37) % 128;
+        const y = (i * 71) % 128;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - 4, y + 18);
+        ctx.stroke();
+      }
+    });
+    const off = (this.time * 1.8) % 1;
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) this.quads.add([-1 + i, 1.5 - j - off, 0], [1, 0, 0], [0, 1, 0], 1, 1);
+    }
+    this.drawQuads(prog, streaks, [1, 1, 1, 0.8]);
+    this.useTex(this.vp, 1);
+  }
+
+  /** Spulletjes om te verzamelen: zwevend boven de weg, naar de camera gericht. */
+  drawItems3d(game, prog) {
+    if (!game.items || !game.items.length || game.state === 'ready' || game.state === 'gameover') return;
+    const camU = [0, Math.cos(this.pitch), -Math.sin(this.pitch)];
+    for (const it of game.items) {
+      const y = 0.42 + Math.sin(this.time * 3 + it.t) * 0.07;
+      this.quads.add([it.col + 0.5, y, it.row + 0.5], [1, 0, 0], camU, 0.62, 0.62);
+      this.drawQuads(prog, this.canvasTex(`item:${it.type}`, 64, 64, (ctx) => paintItem(ctx, it.type, 32, 32, 60)), [1, 1, 1, 1]);
     }
   }
 
@@ -1114,7 +1246,9 @@ export class Renderer3D {
       this.static.upload();
     }
     this.updateCamera(game, dt);
-    gl.clearColor(FOG[0], FOG[1], FOG[2], 1);
+    this.env = this.weatherEnv(game);
+    const env = this.env;
+    gl.clearColor(env.fog[0], env.fog[1], env.fog[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
@@ -1143,6 +1277,7 @@ export class Renderer3D {
     if (theme.decor === 'afsluitdijk') this.drawBoats(dyn);
     if (theme.decor === 'tulips') this.drawWindmill(dyn);
     if (theme.decor === 'turbines') this.drawTurbines(dyn);
+    this.addWorks(dyn, game);
     this.updateParticles(game.paused ? 0 : dt, dyn);
     dyn.upload();
     dyn.draw(lit);
@@ -1171,6 +1306,7 @@ export class Renderer3D {
       }
     }
     this.drawQuads(tex, this.blob, [1, 1, 1, 1]);
+    if (env.weather === 'night') this.drawLightPools(game, tex);
 
     // Blauwe gloed van zwaailichten
     if (this.glows.length) {
@@ -1229,6 +1365,9 @@ export class Renderer3D {
     // Noncha: het voertuig dat je raakte krijgt een rode gloed
     if (game.mode === 'noncha' && game.state === 'hit' && game.hitBy) this.drawReveal(game);
 
+    // Spulletjes om te verzamelen
+    this.drawItems3d(game, tex);
+
     // Poppetjes (met diepte, zodat voertuigen ervoor langs kunnen)
     gl.depthMask(true);
     const overlays = [];
@@ -1241,6 +1380,8 @@ export class Renderer3D {
     gl.depthMask(false);
     this.useTex(this.vp, 0);
     for (const o of overlays) o();
+
+    if (env.weather === 'rain') this.drawRain(tex);
 
     // Noncha "even kijken": in- en uitfaden naar zwart
     const dark = game.darkness;
@@ -1260,6 +1401,33 @@ export class Renderer3D {
     this.enabled = want;
   }
 
+  /**
+   * Weer: kleur van lucht en nevel, helderheid (nacht = donker) en nevel rond de speler
+   * (mist: je ziet ±2 vakjes ver, nacht: ±5 vakjes, daarbuiten alleen koplampen).
+   */
+  weatherEnv(game) {
+    const w = game.params.weather;
+    const ps = game.players;
+    const playing = game.state !== 'ready' && game.state !== 'gameover';
+    const player = playing ? [ps.reduce((s, p) => s + p.col + 0.5, 0) / ps.length, ps.reduce((s, p) => s + p.row + 0.5, 0) / ps.length] : [COLS / 2, this.rows / 2];
+    const none = [1e4, 2e4];
+    // localMax < 1: ver weg zie je nog vage silhouetten (anders lijkt het scherm leeg)
+    if (w === 'fog') return { fog: [0.86, 0.88, 0.9], bright: 0.95, local: [1.8, 5.0], localMax: 0.86, player, weather: w };
+    if (w === 'night') return { fog: [0.03, 0.05, 0.11], bright: 0.55, local: [2.6, 7.5], localMax: 0.93, player, weather: w };
+    if (w === 'rain') return { fog: [0.5, 0.55, 0.62], bright: 0.78, local: none, player, weather: w };
+    return { fog: FOG, bright: 1, local: none, player, weather: 'clear' };
+  }
+
+  setEnv(p) {
+    const gl = this.gl;
+    const env = this.env || { fog: FOG, bright: 1, local: [1e4, 2e4], player: [0, 0] };
+    gl.uniform3f(p.uni.uFogColor, env.fog[0], env.fog[1], env.fog[2]);
+    gl.uniform1f(p.uni.uBright, env.bright);
+    gl.uniform2f(p.uni.uLocalFog, env.local[0], env.local[1]);
+    gl.uniform1f(p.uni.uLocalMax, env.localMax || 0);
+    gl.uniform2f(p.uni.uPlayer, env.player[0], env.player[1]);
+  }
+
   useLit(alpha) {
     const gl = this.gl;
     const p = this.lit;
@@ -1267,7 +1435,7 @@ export class Renderer3D {
     this.setAttribs([p.attr.aPos, p.attr.aNormal, p.attr.aColor]);
     gl.uniformMatrix4fv(p.uni.uViewProj, false, this.vp);
     gl.uniform3f(p.uni.uLight, -0.33, 0.85, 0.41);
-    gl.uniform3f(p.uni.uFogColor, FOG[0], FOG[1], FOG[2]);
+    this.setEnv(p);
     gl.uniform1f(p.uni.uAlpha, alpha);
     return p;
   }
@@ -1278,7 +1446,7 @@ export class Renderer3D {
     gl.useProgram(p.prog);
     this.setAttribs([p.attr.aPos, p.attr.aUV]);
     gl.uniformMatrix4fv(p.uni.uViewProj, false, vp);
-    gl.uniform3f(p.uni.uFogColor, FOG[0], FOG[1], FOG[2]);
+    this.setEnv(p);
     gl.uniform1f(p.uni.uFog, fog);
     gl.uniform1i(p.uni.uTex, 0);
     gl.activeTexture(gl.TEXTURE0);
@@ -1378,6 +1546,73 @@ export class Renderer3D {
         part(-L / 2, -L / 2 + 0.14, 0.4, 0.44, 0.66, dark); // spoiler
         wheels([L / 2 - 0.3, -L / 2 + 0.32], 0.6, 0.16);
         lights(L / 2, -L / 2, 0.16, 0.24, 0.22);
+        break;
+      }
+      case 'f1': {
+        // Raceauto: laag, smalle neus, voor- en achtervleugel, brede banden, helm
+        const dark = rgb('#1b1d21');
+        part(L / 2 - 0.62, L / 2, 0.06, 0.16, 0.2, color); // neus
+        part(-L / 2 + 0.25, L / 2 - 0.55, 0.06, 0.28, 0.42, color); // romp
+        part(-0.18, 0.08, 0.28, 0.44, 0.17, rgb('#ffd60a')); // helm
+        part(L / 2 - 0.12, L / 2, 0.03, 0.08, 0.8, dark); // voorvleugel
+        part(-L / 2, -L / 2 + 0.16, 0.36, 0.44, 0.7, dark); // achtervleugel
+        for (const s of [-1, 1]) {
+          part(-L / 2 + 0.06, -L / 2 + 0.12, 0.2, 0.36, 0.04, dark, s * 0.26);
+          part(L / 2 - 0.55, L / 2 - 0.28, 0, 0.28, 0.16, tyre, s * 0.36);
+          part(-L / 2 + 0.18, -L / 2 + 0.55, 0, 0.32, 0.2, tyre, s * 0.38);
+        }
+        break;
+      }
+      case 'werkwagen': {
+        // Werkwagen: gele bus met rood-witte strepen achterop en oranje zwaailichten
+        part(-L / 2, L / 2, 0.1, 0.8, 0.7, color);
+        part(L / 2 - 0.02, L / 2 + 0.012, 0.44, 0.72, 0.6, glass);
+        part(L / 2 - 0.55, L / 2 - 0.12, 0.48, 0.72, 0.712, glass);
+        for (let i = 0; i < 4; i++) part(-L / 2 - 0.012, -L / 2 + 0.005, 0.15 + i * 0.16, 0.23 + i * 0.16, 0.7, rgb(i % 2 ? '#ffffff' : '#d62828'));
+        wheels([L / 2 - 0.35, -L / 2 + 0.35], 0.62);
+        lights(L / 2, -L / 2, 0.24, 0.34, 0.24);
+        this.lightBar(b, v, cx + f * (L / 2 - 0.5), 0.8, cz, true);
+        break;
+      }
+      case 'pijlwagen': {
+        // Pijlwagen: geel, met een groot zwart pijlbord achterop (knipperende pijl)
+        part(-L / 2 + 0.3, L / 2, 0.1, 0.7, 0.7, color);
+        part(L / 2 - 0.02, L / 2 + 0.012, 0.4, 0.62, 0.6, glass);
+        part(-L / 2, -L / 2 + 0.1, 0.5, 1.5, 0.95, rgb('#111111')); // bord
+        if (Math.floor(this.time * 2.5) % 2 === 0) {
+          for (let i = 0; i < 5; i++) part(-L / 2 - 0.02, -L / 2 + 0.11, 0.75 + i * 0.12, 0.83 + i * 0.12, 0.1, rgb('#ffd60a'), -0.3 + i * 0.15);
+          part(-L / 2 + 0.02, -L / 2 + 0.12, 1.45, 1.53, 0.9, rgb('#ffd60a')); // ook van boven te zien
+        }
+        wheels([L / 2 - 0.35, -L / 2 + 0.4], 0.62);
+        break;
+      }
+      case 'blade': {
+        // Exceptioneel transport: cabine, lange dieplader en een witte windmolenwiek
+        const white = rgb('#f1f3f5');
+        part(L / 2 - 0.9, L / 2, 0.15, 1.0, 0.74, rgb('#1d4ed8'));
+        part(L / 2 - 0.02, L / 2 + 0.012, 0.58, 0.9, 0.62, glass);
+        part(-L / 2 + 0.3, L / 2 - 0.95, 0.12, 0.3, 0.6, rgb('#3b3f46'));
+        // De wiek: dik bij de voet, dun bij de punt
+        const segs = 6;
+        const len = L - 1.1;
+        for (let i = 0; i < segs; i++) {
+          const a1 = L / 2 - 1.0 - (i * len) / segs;
+          const a0 = a1 - len / segs - 0.01;
+          const k = 1 - i / segs;
+          part(a0, a1, 0.3, 0.3 + 0.25 + 0.35 * k, 0.25 + 0.4 * k, white);
+        }
+        part(-L / 2, -L / 2 + 0.25, 0.32, 0.5, 0.2, rgb('#d62828')); // rode vlag aan de punt
+        wheels([L / 2 - 0.35, -L / 2 + 0.6, -L / 2 + 1.1, -L / 2 + 1.6], 0.6, 0.2);
+        break;
+      }
+      case 'begeleider': {
+        // Begeleidingsauto: geel met oranje zwaailichten
+        part(-L / 2, L / 2, 0.1, 0.36, 0.62, color);
+        part(-L / 2 + 0.3, L / 2 - 0.42, 0.36, 0.56, 0.54, glass);
+        part(-L / 2 + 0.36, L / 2 - 0.5, 0.56, 0.6, 0.56, color);
+        wheels([L / 2 - 0.32, -L / 2 + 0.32], 0.56);
+        lights(L / 2, -L / 2, 0.2, 0.29, 0.21);
+        this.lightBar(b, v, cx, 0.6, cz, true);
         break;
       }
       case 'dsi': {
@@ -1517,15 +1752,17 @@ export class Renderer3D {
   }
 
   /** Blauwe zwaailichten op het dak (om en om), met gloed. */
-  lightBar(b, v, x, y, z) {
+  /** Zwaailichten: blauw (hulpdiensten, met gloed) of oranje (werkwagen, begeleider). */
+  lightBar(b, v, x, y, z, amber = false) {
     const phase = Math.floor(this.time * 7 + v.x * 0.37) % 2;
     b.box(x, y, z, 0.16, 0.04, 0.5, rgb('#1b1d21'));
     for (const [side, on] of [
       [-1, phase === 0],
       [1, phase === 1],
     ]) {
-      b.box(x, y + 0.04, z + side * 0.13, 0.14, 0.08, 0.2, rgb(on ? '#dbeafe' : '#1e3a8a'));
-      if (on) this.glows.push([x, y + 0.12, z + side * 0.13]);
+      const color = amber ? (on ? '#ffe08a' : '#9a5b00') : on ? '#dbeafe' : '#1e3a8a';
+      b.box(x, y + 0.04, z + side * 0.13, 0.14, 0.08, 0.2, rgb(color));
+      if (on && !amber) this.glows.push([x, y + 0.12, z + side * 0.13]);
     }
   }
 

@@ -5,6 +5,7 @@ import {
   EMERGENCY_TYPES,
   DSI_CONVOY,
   DSI_SPACING,
+  TRANSPORT_CONVOY,
   SPAWN_MARGIN,
   VEHICLE_HIT_INSET,
   levelParams,
@@ -37,6 +38,15 @@ const SKID_TIME = 0.55; // s remmen (gepiep) voor de klap
 const WRECK_SLIDE = 1.4; // s maximaal wegtollen
 const WRECK_STAY = 6; // s blijven liggen
 const WRECK_FADE = 0.6; // s wegslepen (vervagen)
+
+// Spitsfile: het verkeer rijdt een tijdje, staat dan stil, en trekt weer op
+const JAM_GO = [4, 7]; // s rijden
+const JAM_STOP = [3, 5]; // s stilstaan
+// Eindbaas "exceptioneel transport": langzaam, lang, met begeleidingsauto's
+const TRANSPORT_FIRST = [2, 4];
+const TRANSPORT_DELAY = [7, 11];
+const TRANSPORT_SPEED = 0.45; // t.o.v. de rijstrooksnelheid
+const TRANSPORT_SPACING = 0.6;
 
 function pickWeighted(mix, rng) {
   const entries = Object.entries(mix);
@@ -98,6 +108,11 @@ export class Traffic {
     this.lanes = (this.layout.lanes || LANES).map((cfg) => ({ kind: 'road', ...cfg, vehicles: [], next: null }));
     this.laneByRow = new Map(this.lanes.map((lane) => [lane.row, lane]));
     this.wrecks = [];
+    if (this.params.event === 'works') this.closeLaneForWorks();
+    // Spitsfile: begint rijdend
+    this.jam = this.params.event === 'jam' ? { stop: false, t: this.between(JAM_GO) } : null;
+    this.transportIn = this.params.boss === 'transport' ? this.between(TRANSPORT_FIRST) : Infinity;
+    this.pendingTransport = null;
     for (const lane of this.lanes) this.planNext(lane);
     // Laat het verkeer alvast rijden zodat de weg meteen gevuld is (zonder hulpdiensten/ongelukken).
     const carry = this.emergencyIn;
@@ -112,6 +127,58 @@ export class Traffic {
     else if (!freshGame && carry > 0 && carry < EMERGENCY_DELAY[1]) this.emergencyIn = carry;
     else this.emergencyIn = this.between(EMERGENCY_FIRST);
     this.crashIn = !freshGame && carryCrash > 0 && carryCrash < CRASH_DELAY[1] ? carryCrash : this.between(CRASH_FIRST);
+    // Bijzondere levels: geen hulpdiensten bij een eindbaas, geen aanrijdingen bij file of eindbaas
+    // (de wachttijd loopt na zo'n level gewoon verder)
+    this.paused = { emergency: !!this.params.boss, crash: !!this.jam || !!this.params.boss };
+  }
+
+  /**
+   * Wegwerkzaamheden: één rijstrook is afgezet (pionnen). Daar rijdt alleen af en toe een
+   * werkwagen met een pijlwagen; het verkeer in dezelfde richting schuift in en rijdt langzamer.
+   */
+  closeLaneForWorks() {
+    const roads = this.lanes.filter((l) => l.kind === 'road');
+    if (roads.length < 2) return;
+    // Liever een buitenste strook (zoals bij echte wegwerkzaamheden)
+    const outer = roads.filter((l) => !roads.some((o) => o !== l && o.dir === l.dir && Math.abs(o.row - this.layout.median) > Math.abs(l.row - this.layout.median)));
+    const lane = outer[Math.floor(this.rng() * outer.length)];
+    lane.kind = 'work';
+    lane.speed = 0.3;
+    lane.mix = { werkwagen: 1 };
+    lane.gapScale = 4;
+    for (const l of roads) if (l !== lane && l.dir === lane.dir) l.speed *= 0.8;
+  }
+
+  /** Spitsfile: afwisselend rijden en stilstaan. */
+  updateJam(dt) {
+    if (!this.jam) return;
+    this.jam.t -= dt;
+    if (this.jam.t > 0) return;
+    this.jam.stop = !this.jam.stop;
+    this.jam.t = this.between(this.jam.stop ? JAM_STOP : JAM_GO);
+    this.events.push({ type: this.jam.stop ? 'jamstop' : 'jamgo' });
+  }
+
+  /** Eindbaas: een exceptioneel transport (wiek met begeleiders), om en om in beide richtingen. */
+  updateTransport(dt) {
+    const p = this.pendingTransport;
+    if (p) {
+      if (this.trySpawnConvoy(p.lane, TRANSPORT_CONVOY, p.lane.speed * this.params.baseSpeed * TRANSPORT_SPEED, 0, TRANSPORT_SPACING, { fixed: true })) {
+        p.lane.hold = false;
+        this.pendingTransport = null;
+        this.transportIn = this.between(TRANSPORT_DELAY);
+        this.events.push({ type: 'transport' });
+      }
+      return;
+    }
+    this.transportIn -= dt;
+    if (this.transportIn > 0) return;
+    const roads = this.lanes.filter((l) => l.kind === 'road' && l.dir !== this.lastTransportDir);
+    if (!roads.length) return;
+    const lane = roads[Math.floor(this.rng() * roads.length)];
+    this.lastTransportDir = lane.dir;
+    lane.hold = true; // het verkeer maakt eerst ruimte
+    this.pendingTransport = { lane };
   }
 
   between([lo, hi]) {
@@ -127,8 +194,11 @@ export class Traffic {
       this.moveLane(lane, dt);
       this.trySpawn(lane);
     }
-    this.updateEmergency(dt);
-    this.updateCrash(dt);
+    if (!this.paused || !this.paused.emergency) this.updateEmergency(dt);
+    if (!this.paused || !this.paused.crash) this.updateCrash(dt);
+    else this.updateWrecks(dt);
+    this.updateJam(dt);
+    this.updateTransport(dt);
   }
 
   // --- Hulpdiensten -----------------------------------------------------------------------
@@ -185,10 +255,15 @@ export class Traffic {
   /** Hoe en waar een hulpdienst (of de hele DSI-colonne) in deze rijstrook zou ontstaan. */
   emergencyPlan(lane, type) {
     const units = type === 'convoy' ? DSI_CONVOY : [type];
-    const L = units.reduce((s, u) => s + VEHICLE_TYPES[u].length, 0) + DSI_SPACING * (units.length - 1);
     const speed = Math.min(EMERGENCY_SPEED[1], Math.max(EMERGENCY_SPEED[0], this.params.baseSpeed * lane.speed * EMERGENCY_SPEED_FACTOR));
-    const x = lane.dir > 0 ? -SPAWN_MARGIN - EMERGENCY_FAR - L : COLS + SPAWN_MARGIN + EMERGENCY_FAR;
-    return { units, L, speed, x };
+    return this.convoyPlan(lane, units, speed, EMERGENCY_FAR, DSI_SPACING);
+  }
+
+  /** Een rij voertuigen die samen rijdt (colonne): totale lengte en startplek buiten beeld. */
+  convoyPlan(lane, units, speed, far, spacing) {
+    const L = units.reduce((s, u) => s + VEHICLE_TYPES[u].length, 0) + spacing * (units.length - 1);
+    const x = lane.dir > 0 ? -SPAWN_MARGIN - far - L : COLS + SPAWN_MARGIN + far;
+    return { units, L, speed, x, spacing };
   }
 
   /**
@@ -196,7 +271,11 @@ export class Traffic {
    * niemand inhaalt voordat hij weer uit beeld is. Een colonne telt als één lang voertuig.
    */
   emergencyMargin(lane, type) {
-    const { L, speed, x } = this.emergencyPlan(lane, type);
+    return this.convoyMargin(lane, this.emergencyPlan(lane, type));
+  }
+
+  convoyMargin(lane, plan) {
+    const { L, speed, x } = plan;
     // Zo lang duurt het voordat hij weer uit beeld (en uit de simulatie) is
     const travel = lane.dir > 0 ? COLS + SPAWN_MARGIN - x : x + L + SPAWN_MARGIN;
     const tGone = travel / speed;
@@ -214,15 +293,24 @@ export class Traffic {
   }
 
   trySpawnEmergency(lane, type) {
-    if (this.emergencyMargin(lane, type) < 0) return false;
-    const { units, L, speed, x } = this.emergencyPlan(lane, type);
+    return this.placeConvoy(lane, this.emergencyPlan(lane, type), { emergency: true });
+  }
+
+  /** Colonne neerzetten als hij past (haalt niemand in en er is ruimte bij het begin). */
+  trySpawnConvoy(lane, units, speed, far, spacing, flags) {
+    return this.placeConvoy(lane, this.convoyPlan(lane, units, speed, far, spacing), flags);
+  }
+
+  placeConvoy(lane, plan, flags) {
+    if (this.convoyMargin(lane, plan) < 0) return false;
+    const { units, L, speed, x, spacing } = plan;
     // Voorste voertuig eerst (de lijst loopt van voor naar achter)
     let front = lane.dir > 0 ? x + L : x;
     for (const u of units) {
       const len = VEHICLE_TYPES[u].length;
       const vx = lane.dir > 0 ? front - len : front;
-      lane.vehicles.push({ type: u, length: len, x: vx, desired: speed, speed, color: VEHICLE_TYPES[u].colors[0], emergency: true, convoy: units.length > 1 });
-      front = lane.dir > 0 ? vx - DSI_SPACING : vx + len + DSI_SPACING;
+      lane.vehicles.push({ type: u, length: len, x: vx, desired: speed, speed, color: VEHICLE_TYPES[u].colors[0], convoy: units.length > 1, ...flags });
+      front = lane.dir > 0 ? vx - spacing : vx + len + spacing;
     }
     return true;
   }
@@ -230,6 +318,13 @@ export class Traffic {
   // --- Aanrijdingen -------------------------------------------------------------------------
 
   updateCrash(dt) {
+    this.updateWrecks(dt);
+    this.crashIn -= dt;
+    if (this.crashIn > 0) return;
+    this.crashIn = this.tryCrash() ? this.between(CRASH_DELAY) : 2;
+  }
+
+  updateWrecks(dt) {
     // Voertuigen die aan het remmen zijn voor een aanrijding
     for (const lane of this.lanes) {
       for (const v of lane.vehicles) {
@@ -266,10 +361,6 @@ export class Traffic {
       }
     }
     this.wrecks = this.wrecks.filter((w) => !(w.phase === 'fade' && w.t > WRECK_FADE));
-
-    this.crashIn -= dt;
-    if (this.crashIn > 0) return;
-    this.crashIn = this.tryCrash() ? this.between(CRASH_DELAY) : 2;
   }
 
   /** Kies twee voertuigen achter elkaar in beeld; de voorste remt, de achterste rijdt erop. */
@@ -342,7 +433,7 @@ export class Traffic {
     const type = pickWeighted(mix, this.rng);
     const speed = this.params.baseSpeed * lane.speed * VEHICLE_TYPES[type].speed;
     const { minGapTime, maxGapTime } = this.params;
-    const gapTime = minGapTime + this.rng() * (maxGapTime - minGapTime);
+    const gapTime = (minGapTime + this.rng() * (maxGapTime - minGapTime)) * (lane.gapScale || 1);
     lane.next = { type, speed, gap: gapTime * speed };
   }
 
@@ -360,10 +451,11 @@ export class Traffic {
         v.x += lane.dir * v.speed * dt;
         continue;
       }
-      if (v.emergency) {
-        // Hulpdienst: vaste hoge snelheid (vertrekt alleen als de weg vrij genoeg is). Komt hij
-        // toch vlak achter iemand (die onverwacht afremde), dan remt hij af: nooit erdoorheen.
-        if (wreckGap < 1.0) v.speed = 0;
+      if (v.emergency || v.fixed) {
+        // Hulpdienst of colonne (transport, werkwagen + pijlwagen): vaste snelheid (vertrekt
+        // alleen als de weg vrij genoeg is). Komt hij toch vlak achter iemand (die onverwacht
+        // afremde), dan remt hij af: nooit erdoorheen.
+        if (wreckGap < 1.0 || (this.jam && this.jam.stop && lane.kind === 'road' && !v.emergency)) v.speed = Math.max(0, v.speed - BRAKE * dt);
         else if (i > 0 && gapBetween(lane.dir, vs[i - 1], v) < 1.0) v.speed = Math.min(v.speed, vs[i - 1].speed);
         else v.speed = Math.min(v.desired, v.speed + ACCEL * 2 * dt);
         v.x += lane.dir * v.speed * dt;
@@ -383,6 +475,8 @@ export class Traffic {
         target = 0;
         if (wreckGap < 0.3) v.speed = 0;
       }
+      // Spitsfile: iedereen op de rijbaan stopt (fietsers rijden gewoon door)
+      if (this.jam && this.jam.stop && lane.kind === 'road') target = 0;
       if (v.speed < target && !tooClose) v.speed = Math.min(target, v.speed + ACCEL * dt);
       else if (v.speed > target) v.speed = Math.max(target, v.speed - BRAKE * dt);
       v.x += lane.dir * v.speed * dt;
@@ -401,14 +495,29 @@ export class Traffic {
         lane.dir > 0 ? last.x + SPAWN_MARGIN : COLS + SPAWN_MARGIN - (last.x + last.length);
       if (room < gap) return;
     }
-    lane.vehicles.push({
+    const first = {
       type,
       length: spec.length,
       x: lane.dir > 0 ? -SPAWN_MARGIN - spec.length : COLS + SPAWN_MARGIN,
       desired: speed,
       speed: last ? Math.min(speed, last.speed) : speed,
       color: spec.colors[Math.floor(this.rng() * spec.colors.length)],
-    });
+    };
+    lane.vehicles.push(first);
+    if (spec.follow) {
+      // Werkwagen met een pijlwagen er vlak achter: ze rijden samen (vaste snelheid)
+      const f = VEHICLE_TYPES[spec.follow];
+      first.fixed = true;
+      lane.vehicles.push({
+        type: spec.follow,
+        length: f.length,
+        x: lane.dir > 0 ? first.x - 0.5 - f.length : first.x + first.length + 0.5,
+        desired: speed,
+        speed: first.speed,
+        color: f.colors[0],
+        fixed: true,
+      });
+    }
     this.planNext(lane);
   }
 

@@ -30,6 +30,21 @@ const bike = (row, dir, mix) => ({ row, dir, speed: 0.42, mix, kind: 'bike' });
 const LANES_NL80 = [bike(1, -1, MIX.bikeNl), road(3, -1, 1.0, MIX.roadNl), road(5, 1, 1.0, MIX.roadNl), bike(7, 1, MIX.bikeNl)];
 const LANES_BE90 = [bike(2, -1, MIX.bikeBe), road(3, -1, 1.0, MIX.roadBe), road(5, 1, 1.0, MIX.roadBe), bike(6, 1, MIX.bikeBe)];
 const LANES_2X2 = [road(2, -1, 0.9, MIX.outer), road(3, -1, 1.15, MIX.inner), road(5, 1, 1.15, MIX.inner), road(6, 1, 0.9, MIX.outer)];
+// Circuit (eindbaas): alles rijdt dezelfde kant op, snel maar met grotere gaten
+const race = (row) => ({ row, dir: 1, speed: 1.2, mix: { f1: 1 }, kind: 'road', gapScale: 1.8 });
+const LANES_CIRCUIT = [race(1), race(2), race(3), race(5), race(6), race(7)];
+
+/** Wat je per land kunt verzamelen (zie game.js), met enkelvoud en meervoud voor meldingen. */
+export const ITEMS = {
+  tulp: ['tulp', 'tulpen'],
+  klomp: ['klomp', 'klompen'],
+  stroopwafel: ['stroopwafel', 'stroopwafels'],
+  friet: ['frietje', 'frietjes'],
+  croissant: ['croissant', 'croissants'],
+  kaas: ['kaasje', 'kaasjes'],
+  brezel: ['brezel', 'brezels'],
+  trofee: ['trofee', 'trofeeën'],
+};
 
 export const THEMES = {
   nl80: {
@@ -45,6 +60,7 @@ export const THEMES = {
     decor: 'tulips',
     placeSign: 'nl-kom',
     flag: 'nl',
+    item: 'tulp',
     scenery: 'trees',
     places: ['Ommen', 'Dalfsen', 'Heeze', 'Zuidlaren', 'Bergeijk', 'Woudenberg', 'Hellendoorn', 'Garderen', 'Vriezenveen', 'Giethoorn'],
   },
@@ -62,6 +78,7 @@ export const THEMES = {
     decor: 'frituur',
     placeSign: 'be-kom',
     flag: 'be',
+    item: 'friet',
     scenery: 'trees',
     places: ['Lokeren', 'Hamme', 'Zele', 'Diest', 'Lommel', 'Tielt', 'Poperinge', 'Bilzen', 'Ronse', 'Geel'],
   },
@@ -77,6 +94,7 @@ export const THEMES = {
     decor: 'polder',
     placeSign: 'nl-autoweg',
     flag: 'nl',
+    item: 'klomp',
     scenery: 'trees',
     places: ['Emmeloord', 'Lelystad', 'Hoorn', 'Purmerend', 'Drachten', 'Meppel', 'Harderwijk', 'Kampen'],
   },
@@ -92,6 +110,7 @@ export const THEMES = {
     decor: 'lavender',
     placeSign: 'fr-ville',
     flag: 'fr',
+    item: 'croissant',
     scenery: 'poplars',
     places: ['Lille', 'Arras', 'Reims', 'Amiens', 'Dijon', 'Beaune', 'Orléans', 'Chartres', 'Rouen', 'Troyes'],
   },
@@ -107,6 +126,7 @@ export const THEMES = {
     decor: 'chalet',
     placeSign: 'ch-green',
     flag: 'ch',
+    item: 'kaas',
     scenery: 'firs',
     places: ['Basel', 'Bern', 'Luzern', 'Zürich', 'Chur', 'Thun', 'Lugano', 'Interlaken'],
   },
@@ -122,6 +142,7 @@ export const THEMES = {
     decor: 'afsluitdijk', // water aan beide kanten, basalt, monument, zeilboot
     placeSign: 'nl-anwb',
     flag: 'nl',
+    item: 'stroopwafel',
     scenery: 'none',
     places: ['Den Oever', 'Afsluitdijk', 'Kornwerderzand'],
   },
@@ -137,12 +158,29 @@ export const THEMES = {
     decor: 'turbines',
     placeSign: 'de-autobahn',
     flag: 'de',
+    item: 'brezel',
     scenery: 'trees',
     places: [
       'Köln', 'Düsseldorf', 'Dortmund', 'Hannover', 'Kassel', 'Frankfurt', 'Würzburg', 'Nürnberg', 'München',
       'Stuttgart', 'Karlsruhe', 'Bremen', 'Hamburg', 'Berlin', 'Leipzig', 'Dresden', 'Münster', 'Bielefeld',
       'Oberhausen', 'Duisburg', 'Aachen', 'Mannheim', 'Heidelberg', 'Ulm',
     ],
+  },
+  circuit: {
+    label: 'Circuit',
+    lanes: LANES_CIRCUIT,
+    speedSign: 'checkered',
+    median: 'pitwall',
+    edge: 'curbs',
+    road: '#3a3c40',
+    grass: '#4f9a3c',
+    verge: '',
+    decor: 'grandstand',
+    placeSign: 'circuit',
+    flag: 'checkered',
+    item: 'trofee',
+    scenery: 'trees',
+    places: ['Zandvoort', 'Spa-Francorchamps', 'Nürburgring', 'Monza', 'Silverstone', 'Monaco'],
   },
 };
 

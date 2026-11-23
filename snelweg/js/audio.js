@@ -19,6 +19,12 @@ const ENGINES = {
   // Fietsen: zacht zoemen van de banden, en een belletje als ze vlak bij je zijn
   bike: { freq: 140, wave: 'triangle', lp: 300, noise: 2600, noiseGain: 0.6, gain: 0.16, bell: true },
   bakfiets: { freq: 120, wave: 'triangle', lp: 300, noise: 2200, noiseGain: 0.7, gain: 0.2, bell: true },
+  // Wegwerkzaamheden, exceptioneel transport en raceauto's
+  werkwagen: { freq: 60, wave: 'sawtooth', lp: 520, noise: 650, noiseGain: 0.4, gain: 0.5 },
+  pijlwagen: { freq: 48, wave: 'sawtooth', lp: 420, noise: 400, noiseGain: 0.5, gain: 0.5 },
+  blade: { freq: 34, wave: 'sawtooth', lp: 300, noise: 220, noiseGain: 0.7, gain: 0.9, sub: true },
+  begeleider: { freq: 76, wave: 'sawtooth', lp: 700, noise: 900, noiseGain: 0.35, gain: 0.45 },
+  f1: { freq: 240, wave: 'sawtooth', lp: 3600, noise: 3200, noiseGain: 0.2, gain: 0.55 }, // gierend hoog
   // DSI-colonne: zwarte auto's zonder sirene; de politiemotoren voorop en achteraan met een snelle sirene
   dsi: { freq: 70, wave: 'sawtooth', lp: 650, noise: 850, noiseGain: 0.35, gain: 0.42 },
   policemotor: { freq: 160, wave: 'sawtooth', lp: 2200, noise: 2600, noiseGain: 0.25, gain: 0.45, tremolo: 26, siren: { lo: 740, hi: 1180, rate: 2.5 } },
@@ -209,6 +215,18 @@ export class AudioEngine {
           this.tone(3200 + Math.random() * 2400, t + 0.12 + i * 0.05, 0.08, { type: 'sine', gain: 0.06, pan });
         }
         break;
+      case 'collect': // spulletje opgepakt: vrolijke pling
+        this.tone(988, t, 0.1, { type: 'triangle', gain: 0.22, pan });
+        this.tone(1319, t + 0.08, 0.18, { type: 'triangle', gain: 0.22, pan });
+        break;
+      case 'jamgo': // file trekt op: korte toeter
+        this.tone(415, t, 0.18, { type: 'square', gain: 0.08 });
+        this.tone(523, t, 0.18, { type: 'square', gain: 0.06 });
+        break;
+      case 'transport': // exceptioneel transport: diepe hoorn
+        this.tone(110, t, 0.9, { type: 'sawtooth', gain: 0.16, attack: 0.05 });
+        this.tone(139, t, 0.9, { type: 'sawtooth', gain: 0.12, attack: 0.05 });
+        break;
       case 'bell': // fietsbel: tring-tring
         for (const d of [0, 0.16]) {
           this.tone(2350, t + d, 0.14, { type: 'sine', gain: 0.16, pan });
@@ -220,6 +238,32 @@ export class AudioEngine {
         break;
       default:
         break;
+    }
+  }
+
+  /** Weergeluid: regen ruist zachtjes (alleen tijdens het spelen). */
+  setWeather(weather) {
+    if (!this.ready) return;
+    const want = weather === 'rain';
+    if (want === !!this.rain) return;
+    const now = this.ctx.currentTime;
+    if (want) {
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noise;
+      src.loop = true;
+      const hp = this.ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 1800;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.07, now + 1);
+      src.connect(hp).connect(g).connect(this.master);
+      src.start(now);
+      this.rain = { src, g };
+    } else {
+      this.rain.g.gain.setTargetAtTime(0.0001, now, 0.3);
+      this.rain.src.stop(now + 1.5);
+      this.rain = null;
     }
   }
 

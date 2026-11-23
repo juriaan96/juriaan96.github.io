@@ -39,12 +39,197 @@ export const FLAGS = {
   fr: { dir: 'v', colors: ['#0055a4', '#ffffff', '#ef4135'] },
   de: { dir: 'h', colors: ['#111111', '#dd0000', '#ffce00'] },
   ch: { dir: 'cross', colors: ['#da291c', '#ffffff'] },
+  checkered: { dir: 'checker', colors: ['#111111', '#ffffff'] }, // geblokte vlag (circuit)
 };
+
+/** Geblokt patroon (finishvlag) in de rechthoek (x, y, w, h). */
+export function paintCheckered(ctx, x, y, w, h, cols = 6, rows = 4) {
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      ctx.fillStyle = (r + c) % 2 ? '#ffffff' : '#111111';
+      // 2% overlap tegen naden (werkt in pixels en in vakjes)
+      ctx.fillRect(x + (c * w) / cols, y + (r * h) / rows, (w / cols) * 1.02, (h / rows) * 1.02);
+    }
+  }
+}
+
+/**
+ * Spulletje om te verzamelen, gecentreerd op (cx, cy) met grootte s (pixels).
+ * tulp, klomp, stroopwafel, friet, croissant, kaas, brezel, trofee.
+ */
+export function paintItem(ctx, type, cx, cy, s) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(s, s);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  // Witte gloed eromheen, zodat je het op de weg ziet
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  ctx.arc(0, 0, 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  switch (type) {
+    case 'tulp':
+      ctx.strokeStyle = '#2f7d32';
+      ctx.lineWidth = 0.07;
+      ctx.beginPath();
+      ctx.moveTo(0, 0.42);
+      ctx.lineTo(0, -0.02);
+      ctx.stroke();
+      ctx.fillStyle = '#3f9a3f';
+      ctx.beginPath();
+      ctx.ellipse(-0.12, 0.22, 0.1, 0.05, -0.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#e63946';
+      ctx.beginPath();
+      ctx.moveTo(-0.2, -0.32);
+      ctx.lineTo(-0.1, -0.18);
+      ctx.lineTo(0, -0.36);
+      ctx.lineTo(0.1, -0.18);
+      ctx.lineTo(0.2, -0.32);
+      ctx.quadraticCurveTo(0.22, 0.02, 0, 0.04);
+      ctx.quadraticCurveTo(-0.22, 0.02, -0.2, -0.32);
+      ctx.fill();
+      break;
+    case 'klomp':
+      ctx.fillStyle = '#f2c14e';
+      ctx.strokeStyle = '#a07a1c';
+      ctx.lineWidth = 0.04;
+      ctx.beginPath();
+      ctx.moveTo(-0.38, 0.18);
+      ctx.lineTo(-0.38, -0.12);
+      ctx.quadraticCurveTo(-0.3, -0.22, -0.1, -0.16);
+      ctx.lineTo(0.3, -0.06);
+      ctx.quadraticCurveTo(0.44, 0.02, 0.36, 0.18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#8b5a2b';
+      ctx.beginPath();
+      ctx.ellipse(-0.22, -0.12, 0.1, 0.04, 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'stroopwafel':
+      ctx.fillStyle = '#c98a3e';
+      ctx.beginPath();
+      ctx.arc(0, 0, 0.36, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#9c6428';
+      ctx.lineWidth = 0.03;
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * 0.13 - 0.3, -0.3);
+        ctx.lineTo(i * 0.13 + 0.3, 0.3);
+        ctx.moveTo(i * 0.13 + 0.3, -0.3);
+        ctx.lineTo(i * 0.13 - 0.3, 0.3);
+        ctx.stroke();
+      }
+      break;
+    case 'friet':
+      ctx.fillStyle = '#ffd60a';
+      for (let i = 0; i < 6; i++) ctx.fillRect(-0.2 + i * 0.07, -0.4 + (i % 2) * 0.08, 0.05, 0.36);
+      ctx.fillStyle = '#d62828';
+      ctx.beginPath();
+      ctx.moveTo(-0.26, -0.08);
+      ctx.lineTo(0.26, -0.08);
+      ctx.lineTo(0, 0.42);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-0.15, 0.0, 0.3, 0.05);
+      break;
+    case 'croissant':
+      ctx.fillStyle = '#e8a23a';
+      ctx.strokeStyle = '#a8661a';
+      ctx.lineWidth = 0.03;
+      ctx.beginPath();
+      ctx.arc(0, 0.18, 0.4, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.arc(0, 0.32, 0.22, Math.PI * 1.9, Math.PI * 1.1, true);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      for (const a of [1.3, 1.5, 1.7]) {
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a * Math.PI) * 0.22, 0.32 + Math.sin(a * Math.PI) * 0.22);
+        ctx.lineTo(Math.cos(a * Math.PI) * 0.4, 0.18 + Math.sin(a * Math.PI) * 0.4);
+        ctx.stroke();
+      }
+      break;
+    case 'kaas':
+      ctx.fillStyle = '#ffcf3f';
+      ctx.strokeStyle = '#c9971a';
+      ctx.lineWidth = 0.03;
+      ctx.beginPath();
+      ctx.moveTo(-0.38, 0.25);
+      ctx.lineTo(0.38, 0.25);
+      ctx.lineTo(0.38, -0.05);
+      ctx.lineTo(-0.38, -0.3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#e0ad24';
+      for (const [x, y, r] of [
+        [-0.15, 0.08, 0.06],
+        [0.12, 0.12, 0.05],
+        [0.22, -0.02, 0.035],
+      ]) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    case 'brezel':
+      ctx.strokeStyle = '#8b4a1c';
+      ctx.lineWidth = 0.1;
+      ctx.beginPath();
+      ctx.arc(-0.14, -0.04, 0.17, Math.PI * 0.6, Math.PI * 2.3);
+      ctx.moveTo(0.31, -0.04);
+      ctx.arc(0.14, -0.04, 0.17, 0, Math.PI * 1.4);
+      ctx.moveTo(-0.22, 0.12);
+      ctx.lineTo(0.2, 0.32);
+      ctx.moveTo(0.22, 0.12);
+      ctx.lineTo(-0.2, 0.32);
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      for (const [x, y] of [
+        [-0.2, -0.16],
+        [0.18, -0.18],
+        [0, 0.22],
+      ]) {
+        ctx.fillRect(x, y, 0.04, 0.04);
+      }
+      break;
+    case 'trofee':
+      ctx.fillStyle = '#f5c518';
+      ctx.beginPath();
+      ctx.moveTo(-0.24, -0.36);
+      ctx.lineTo(0.24, -0.36);
+      ctx.quadraticCurveTo(0.24, 0.04, 0, 0.06);
+      ctx.quadraticCurveTo(-0.24, 0.04, -0.24, -0.36);
+      ctx.fill();
+      ctx.fillRect(-0.04, 0.04, 0.08, 0.18);
+      ctx.fillRect(-0.18, 0.22, 0.36, 0.12);
+      ctx.strokeStyle = '#f5c518';
+      ctx.lineWidth = 0.05;
+      ctx.beginPath();
+      ctx.arc(-0.26, -0.22, 0.1, Math.PI * 0.5, Math.PI * 1.5);
+      ctx.arc(0.26, -0.22, 0.1, Math.PI * 1.5, Math.PI * 0.5);
+      ctx.stroke();
+      break;
+    default:
+      break;
+  }
+  ctx.restore();
+}
 
 /** Vlaggetje in de rechthoek (x, y, w, h). */
 export function paintFlag(ctx, x, y, w, h, flag) {
   const f = FLAGS[flag];
   if (!f) return;
+  if (f.dir === 'checker') {
+    paintCheckered(ctx, x, y, w, h, 4, 3);
+    return;
+  }
   if (f.dir === 'cross') {
     ctx.fillStyle = f.colors[0];
     ctx.fillRect(x, y, w, h);
@@ -167,6 +352,7 @@ export function paintPlaceSign(ctx, x, y, w, h, style, place) {
     'ch-green': '#1b7a3e',
     'nl-anwb': '#1f4fa0',
     'de-autobahn': '#1f4fa0',
+    circuit: '#111111',
   }[style] || '#1f4fa0';
   const edge = { 'be-kom': '#111111', 'fr-ville': '#d7261e' }[style] || '#ffffff';
   const ink = style === 'be-kom' || style === 'fr-ville' ? '#111111' : '#ffffff';

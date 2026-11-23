@@ -1,7 +1,7 @@
 import { COLS, ROWS, ROW_FINISH } from './config.js';
 import { drawCharacter } from './character.js';
 import { THEMES, rowKinds, layoutFor } from './themes.js';
-import { paintUnlimited, paintRoundSign, paintPlaceSign, paintFlag } from './signs.js';
+import { paintUnlimited, paintRoundSign, paintPlaceSign, paintFlag, paintCheckered, paintItem } from './signs.js';
 
 const C = {
   grass: '#5a9443',
@@ -181,7 +181,14 @@ export class Renderer {
 
     // 2. Strepen: kantstrepen langs elke rijbaan, onderbroken strepen tussen rijstroken
     const edgeLine = (y) => {
-      if (t.edge === 'dashed') for (let x = 0.1; x < COLS; x += 1.0) ctx.fillRect(x, y, 0.55, 0.05);
+      if (t.edge === 'curbs') {
+        // Circuit: rood-witte curbs
+        for (let x = 0, i = 0; x < COLS; x += 0.5, i++) {
+          ctx.fillStyle = i % 2 ? '#ffffff' : '#d62828';
+          ctx.fillRect(x, y - 0.04, 0.5, 0.13);
+        }
+        ctx.fillStyle = C.line;
+      } else if (t.edge === 'dashed') for (let x = 0.1; x < COLS; x += 1.0) ctx.fillRect(x, y, 0.55, 0.05);
       else ctx.fillRect(0, y, COLS, 0.05);
     };
     ctx.fillStyle = C.line;
@@ -205,6 +212,16 @@ export class Renderer {
       ctx.fillStyle = C.line;
       ctx.fillRect(0, m + 0.22, COLS, 0.06);
       ctx.fillRect(0, m + 0.72, COLS, 0.06);
+    } else if (t.median === 'pitwall') {
+      // Circuit: muur langs de pitstraat, met een hek erop
+      ctx.fillStyle = C.shadow;
+      ctx.fillRect(0, m + 0.62, COLS, 0.08);
+      ctx.fillStyle = '#d4d4cf';
+      ctx.fillRect(0, m + 0.32, COLS, 0.3);
+      ctx.fillStyle = '#8f949b';
+      for (let x = 0; x < COLS; x += 0.4) ctx.fillRect(x, m + 0.3, 0.03, 0.34);
+      ctx.fillStyle = '#d62828';
+      ctx.fillRect(0, m + 0.44, COLS, 0.05);
     } else if (t.median === 'double') {
       // België: dubbele doorgetrokken streep
       ctx.fillStyle = C.line;
@@ -267,6 +284,13 @@ export class Renderer {
 
     // 5. Typisch voor het land, op de overkant (links van het plaatsbord)
     this.drawDecor2d(ctx, t, rnd);
+
+    // 6. Circuit: geblokte start/finishlijn dwars over de baan
+    if (t.edge === 'curbs') {
+      kinds.forEach((k, row) => {
+        if (k === 'road') paintCheckered(ctx, 6.3, row, 0.4, 1, 2, 5);
+      });
+    }
   }
 
   /** Klein fietssymbool (fietspad), in vakjes; lijnstijl moet al gezet zijn. */
@@ -430,6 +454,20 @@ export class Renderer {
         }
         break;
       }
+      case 'grandstand': {
+        // Circuit: tribune vol publiek
+        ctx.fillStyle = '#6b7280';
+        ctx.fillRect(1.2, y0 + 0.05, 7.6, 0.82);
+        for (let r = 0; r < 4; r++) {
+          for (let x = 1.35; x < 8.7; x += 0.22) {
+            ctx.fillStyle = ['#e63946', '#ffd60a', '#1d4ed8', '#ffffff', '#f77f00', '#2a9d8f'][Math.floor(rnd() * 6)];
+            ctx.beginPath();
+            ctx.arc(x, y0 + 0.17 + r * 0.19, 0.07, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        break;
+      }
       case 'noisewall': {
         // Geluidsscherm langs de snelweg
         ctx.fillStyle = '#7f8f7a';
@@ -517,6 +555,8 @@ export class Renderer {
     ctx.setTransform(this.scale, 0, 0, this.scale, sx, sy);
 
     this.drawSigns(game);
+    this.drawWorks(game);
+    if (game.state !== 'ready' && game.state !== 'gameover') this.drawItems(game);
     for (const lane of game.traffic.lanes) {
       for (const v of lane.vehicles) this.drawVehicle(v, lane);
     }
@@ -525,6 +565,7 @@ export class Renderer {
     if (game.state !== 'ready' && game.state !== 'gameover') this.drawPlayers(game);
     this.drawParticles(game.paused ? 0 : dt);
     this.drawTapMarker(dt);
+    this.drawWeather(game, game.paused ? 0 : dt);
 
     // Noncha "even kijken": in- en uitfaden naar zwart
     const dark = game.darkness;
@@ -595,7 +636,14 @@ export class Renderer {
     const [ox, oy] = this.shake || [0, 0];
     const mx = 0.15;
     const my = game.layout.median + 0.08;
-    if (t.speedSign === 'round') {
+    if (t.speedSign === 'checkered') {
+      // Circuit: geblokt bord in plaats van een snelheid
+      fillRound(ctx, mx, my, 0.84, 0.84, 0.08, '#111');
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, ox, oy);
+      paintCheckered(ctx, (mx + 0.1) * s, (my + 0.16) * s, 0.64 * s, 0.52 * s, 5, 4);
+      ctx.restore();
+    } else if (t.speedSign === 'round') {
       // Gewoon verkeersbord
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, ox, oy);
@@ -645,6 +693,24 @@ export class Renderer {
     }
     if (lane.dir < 0) ctx.scale(-1, 1); // tekenen alsof hij naar rechts rijdt
     switch (v.type) {
+      case 'f1':
+        this.drawF1(v, L);
+        break;
+      case 'werkwagen':
+        this.drawCar(v, L, 0.72, true);
+        this.drawChevrons(L, 0.72);
+        this.drawLightBar(v, L / 2 - 0.7, 0.5, true);
+        break;
+      case 'pijlwagen':
+        this.drawArrowTruck(v, L);
+        break;
+      case 'blade':
+        this.drawBlade(v, L);
+        break;
+      case 'begeleider':
+        this.drawCar(v, L, 0.62, false);
+        this.drawLightBar(v, -0.1, 0.44, true);
+        break;
       case 'dsi':
         // Zwarte auto met blauwe lichten in de grille
         this.drawCar(v, L, 0.64, false);
@@ -705,6 +771,221 @@ export class Renderer {
       }
     }
     ctx.restore();
+  }
+
+  /** Wegwerkzaamheden: gele strepen en pionnen langs de afgezette rijstrook. */
+  drawWorks(game) {
+    const ctx = this.ctx;
+    for (const lane of game.traffic.lanes) {
+      if (lane.kind !== 'work') continue;
+      const y = lane.row;
+      ctx.fillStyle = 'rgba(255, 194, 14, 0.18)';
+      ctx.fillRect(0, y, COLS, 1);
+      ctx.fillStyle = '#ffc20e';
+      for (let x = 0.1; x < COLS; x += 0.7) {
+        ctx.fillRect(x, y + 0.04, 0.4, 0.05);
+        ctx.fillRect(x, y + 0.91, 0.4, 0.05);
+      }
+      for (let x = 0.5; x < COLS; x += 1) {
+        for (const cy of [y + 0.14, y + 0.86]) {
+          ctx.fillStyle = '#f97316';
+          ctx.beginPath();
+          ctx.arc(x, cy, 0.1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 0.03;
+          ctx.beginPath();
+          ctx.arc(x, cy, 0.06, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  /** Spulletjes om te verzamelen (wippen een beetje). */
+  drawItems(game) {
+    if (!game.items || !game.items.length) return;
+    const ctx = this.ctx;
+    const s = this.scale;
+    const [ox, oy] = this.shake || [0, 0];
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, ox, oy);
+    for (const it of game.items) {
+      const bob = Math.sin((this.time || 0) * 3 + it.t) * 0.04;
+      paintItem(ctx, it.type, (it.col + 0.5) * s, (it.row + 0.5 + bob) * s, 0.62 * s);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Weer: regen (strepen en donkerder), mist (je ziet alleen vlak om je heen) of nacht
+   * (donker, met koplampen en een lichtkring om je poppetje).
+   */
+  drawWeather(game, dt) {
+    const w = game.params.weather;
+    if (!w || w === 'clear') return;
+    const ctx = this.ctx;
+    const s = this.scale;
+    const W = this.canvas.width;
+    const H = this.canvas.height;
+    const rows = this.rows;
+    if (w === 'rain') {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = 'rgba(30, 45, 70, 0.22)';
+      ctx.fillRect(0, 0, W, H);
+      if (!this.drops) this.drops = Array.from({ length: 150 }, () => ({ x: Math.random() * (COLS + 2), y: Math.random() * ROWS }));
+      ctx.strokeStyle = 'rgba(210, 225, 255, 0.55)';
+      ctx.lineWidth = Math.max(1, 0.025 * s);
+      ctx.beginPath();
+      for (const d of this.drops) {
+        d.y += 10 * dt;
+        d.x -= 2 * dt;
+        if (d.y > rows) {
+          d.y -= rows;
+          d.x = Math.random() * (COLS + 2);
+        }
+        if (d.x < -1) d.x += COLS + 2;
+        ctx.moveTo(d.x * s, d.y * s);
+        ctx.lineTo((d.x + 0.07) * s, (d.y - 0.35) * s);
+      }
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    // Mist en nacht: een "lichtkaart" over het veld, met gaten waar je wél iets ziet
+    if (!this.fx) this.fx = document.createElement('canvas');
+    if (this.fx.width !== W || this.fx.height !== H) {
+      this.fx.width = W;
+      this.fx.height = H;
+    }
+    const f = this.fx.getContext('2d');
+    f.setTransform(1, 0, 0, 1, 0, 0);
+    f.globalCompositeOperation = 'source-over';
+    f.clearRect(0, 0, W, H);
+    f.fillStyle = w === 'fog' ? 'rgba(222, 228, 234, 0.84)' : 'rgba(4, 8, 22, 0.86)';
+    f.fillRect(0, 0, W, H);
+    f.globalCompositeOperation = 'destination-out';
+    const hole = (x, y, r0, r1, a = 1) => {
+      const g = f.createRadialGradient(x * s, y * s, r0 * s, x * s, y * s, r1 * s);
+      g.addColorStop(0, `rgba(0,0,0,${a})`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      f.fillStyle = g;
+      f.beginPath();
+      f.arc(x * s, y * s, r1 * s, 0, Math.PI * 2);
+      f.fill();
+    };
+    if (game.state !== 'ready' && game.state !== 'gameover') {
+      for (const p of game.players) hole(p.col + 0.5, p.row + 0.5, w === 'fog' ? 1.6 : 0.9, w === 'fog' ? 4.0 : 2.4);
+    }
+    if (w === 'night') {
+      // Koplampen schijnen vooruit, en het voertuig zelf is vaag te zien
+      for (const lane of game.traffic.lanes) {
+        for (const v of lane.vehicles) {
+          if (v.x + v.length < -2 || v.x > COLS + 2) continue;
+          const front = lane.dir > 0 ? v.x + v.length : v.x;
+          hole(front + lane.dir * 0.9, lane.row + 0.5, 0.1, 1.2, 0.9);
+          hole(v.x + v.length / 2, lane.row + 0.5, 0, Math.max(0.6, v.length / 2), 0.55);
+        }
+      }
+      hole(0.57, game.layout.median + 0.5, 0, 0.7, 0.8); // verlicht bord
+    }
+    f.globalCompositeOperation = 'source-over';
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(this.fx, 0, 0);
+    ctx.restore();
+  }
+
+  /** Raceauto van boven: smalle neus, voor- en achtervleugel, brede banden, helm. */
+  drawF1(v, L) {
+    const ctx = this.ctx;
+    const x0 = -L / 2;
+    ctx.fillStyle = C.shadow;
+    ctx.fillRect(x0 + 0.06, -0.3, L, 0.64);
+    ctx.fillStyle = '#16181b';
+    for (const [x, w] of [
+      [L / 2 - 0.5, 0.26],
+      [x0 + 0.12, 0.32],
+    ]) {
+      ctx.fillRect(x, -0.38, w, 0.16);
+      ctx.fillRect(x, 0.22, w, 0.16);
+    }
+    fillRound(ctx, x0 + 0.2, -0.16, L - 0.45, 0.32, 0.12, v.color); // romp
+    fillRound(ctx, L / 2 - 0.5, -0.07, 0.5, 0.14, 0.06, v.color); // neus
+    ctx.fillStyle = '#1b1d21';
+    ctx.fillRect(L / 2 - 0.12, -0.34, 0.1, 0.68); // voorvleugel
+    ctx.fillRect(x0, -0.3, 0.14, 0.6); // achtervleugel
+    ctx.fillStyle = '#ffd60a';
+    ctx.beginPath();
+    ctx.arc(-0.02, 0, 0.09, 0, Math.PI * 2); // helm
+    ctx.fill();
+  }
+
+  /** Rood-witte schuine strepen achterop (werkwagen). */
+  drawChevrons(L, h) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-L / 2, -h / 2, 0.35, h);
+    ctx.clip();
+    for (let i = -4; i < 6; i++) {
+      ctx.fillStyle = i % 2 ? '#ffffff' : '#d62828';
+      ctx.beginPath();
+      ctx.moveTo(-L / 2, -h / 2 + i * 0.16);
+      ctx.lineTo(-L / 2 + 0.35, -h / 2 + i * 0.16 + 0.2);
+      ctx.lineTo(-L / 2 + 0.35, -h / 2 + i * 0.16 + 0.36);
+      ctx.lineTo(-L / 2, -h / 2 + i * 0.16 + 0.16);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /** Pijlwagen: geel, met een groot zwart bord met een knipperende pijl. */
+  drawArrowTruck(v, L) {
+    const ctx = this.ctx;
+    this.drawCar(v, L, 0.72, true);
+    fillRound(ctx, -L / 2 + 0.05, -0.34, 0.9, 0.68, 0.06, '#111111');
+    if (Math.floor((this.time || 0) * 2.5) % 2 === 0) {
+      // Pijl schuin naar de vrije rijstrook
+      ctx.strokeStyle = '#ffd60a';
+      ctx.lineWidth = 0.07;
+      ctx.beginPath();
+      ctx.moveTo(-L / 2 + 0.2, 0.2);
+      ctx.lineTo(-L / 2 + 0.75, -0.2);
+      ctx.moveTo(-L / 2 + 0.5, -0.22);
+      ctx.lineTo(-L / 2 + 0.75, -0.2);
+      ctx.lineTo(-L / 2 + 0.72, 0.04);
+      ctx.stroke();
+    }
+  }
+
+  /** Exceptioneel transport: cabine met een heel lange witte windmolenwiek. */
+  drawBlade(v, L) {
+    const ctx = this.ctx;
+    const x0 = -L / 2;
+    ctx.fillStyle = C.shadow;
+    ctx.fillRect(x0 + 0.1, -0.3, L, 0.66);
+    ctx.fillStyle = '#3b3f46';
+    ctx.fillRect(x0 + 0.3, -0.2, L - 1.2, 0.4); // lange dieplader
+    fillRound(ctx, L / 2 - 0.9, -0.36, 0.9, 0.72, 0.1, '#1d4ed8'); // cabine
+    fillRound(ctx, L / 2 - 0.3, -0.26, 0.18, 0.52, 0.05, C.glass);
+    // De wiek: breed bij de voet, smal bij de punt
+    ctx.fillStyle = '#f1f3f5';
+    ctx.strokeStyle = '#c6cbd2';
+    ctx.lineWidth = 0.03;
+    ctx.beginPath();
+    ctx.moveTo(L / 2 - 1.0, -0.3);
+    ctx.lineTo(L / 2 - 1.0, 0.3);
+    ctx.quadraticCurveTo(x0 + 4, 0.34, x0, 0.06);
+    ctx.lineTo(x0, -0.02);
+    ctx.quadraticCurveTo(x0 + 4, -0.2, L / 2 - 1.0, -0.3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#d62828';
+    ctx.fillRect(x0, -0.04, 0.25, 0.12); // rode vlag aan de punt
   }
 
   /** Wrakken na een aanrijding (gedraaid, met alarmlichten). */
@@ -861,8 +1142,8 @@ export class Renderer {
     ctx.fillRect(-L / 2 + 0.05, -y0 - 0.11, L - 0.1, 0.03);
   }
 
-  /** Blauwe zwaailichten op het dak, om en om knipperend. */
-  drawLightBar(v, x, w) {
+  /** Zwaailichten op het dak, om en om knipperend: blauw (hulpdiensten) of oranje (werk/transport). */
+  drawLightBar(v, x, w, amber = false) {
     const ctx = this.ctx;
     const phase = Math.floor((this.time || 0) * 7 + v.x * 0.37) % 2;
     ctx.fillStyle = '#1b1d21';
@@ -873,12 +1154,13 @@ export class Renderer {
     ]) {
       const y = (side * w) / 4;
       if (on) {
-        ctx.fillStyle = 'rgba(96, 165, 250, 0.45)';
+        ctx.fillStyle = amber ? 'rgba(255, 170, 30, 0.45)' : 'rgba(96, 165, 250, 0.45)';
         ctx.beginPath();
         ctx.arc(x, y, 0.28, 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.fillStyle = on ? '#bfdbfe' : '#1e3a8a';
+      if (amber) ctx.fillStyle = on ? '#ffe08a' : '#9a5b00';
+      else ctx.fillStyle = on ? '#bfdbfe' : '#1e3a8a';
       ctx.fillRect(x - 0.06, y - w / 4 + 0.02, 0.12, w / 2 - 0.04);
     }
   }
