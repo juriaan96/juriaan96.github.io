@@ -178,9 +178,39 @@ function buildPage(T, auto, base) {
   backBtn.className = 'back'; backBtn.href = base || './';
   backBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Alle klokken';
   document.body.insertBefore(backBtn, document.body.firstChild);
+  fullscreenButton();
   const rain = document.createElement('canvas');
   rain.id = 'rain'; rain.setAttribute('aria-hidden', 'true');
   document.body.appendChild(rain);
+}
+
+/* ---------- volledig scherm ---------- */
+function fullscreenButton() {
+  const de = document.documentElement;
+  if (!(de.requestFullscreen || de.webkitRequestFullscreen)) return; /* bv. iPhone: geen Fullscreen-API */
+  const isFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const quiet = p => { if (p && p.catch) p.catch(() => {}); };
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'back fs';
+  function upd() {
+    const on = isFs();
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="' +
+      (on ? 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5' : 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5') +
+      '" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      (on ? 'Scherm verkleinen' : 'Volledig scherm');
+    btn.setAttribute('aria-label', on ? 'Volledig scherm verlaten' : 'Volledig scherm');
+  }
+  btn.addEventListener('click', e => {
+    try {
+      if (isFs()) quiet(document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen());
+      else quiet(de.requestFullscreen ? de.requestFullscreen() : de.webkitRequestFullscreen());
+    } catch (err) { /* niet toegestaan: niets doen */ }
+    if (e.detail > 0) btn.blur();
+  });
+  document.addEventListener('fullscreenchange', upd);
+  document.addEventListener('webkitfullscreenchange', upd);
+  upd();
+  document.body.insertBefore(btn, document.body.firstChild);
 }
 
 /* ---------- de klok laten lopen ---------- */
