@@ -28,16 +28,29 @@ export const VEHICLE_TYPES = {
   van: { length: 2.0, speed: 0.92, colors: ['#f4f5f2', '#dfe3e8', '#f2c230', '#2b7fc1'] },
   truck: { length: 3.8, speed: 0.78, colors: ['#c8283f', '#2557c9', '#e86b1c', '#4b5563', '#1f8a4c'] },
   motor: { length: 0.8, speed: 1.25, colors: ['#15171b', '#b91c1c', '#f97316', '#e5e7eb'] },
+  // Alleen op de Autobahn: laag en snel
+  sport: { length: 1.4, speed: 1.6, colors: ['#facc15', '#dc2626', '#f97316', '#e5e7eb', '#111827', '#84cc16'] },
+  // Hulpdiensten: komen af en toe met sirene voorbij (zie EMERGENCY in traffic.js)
+  fire: { length: 2.6, speed: 1, colors: ['#c8102e'], emergency: true },
+  ambulance: { length: 2.0, speed: 1, colors: ['#ffd21f'], emergency: true },
+  police: { length: 1.6, speed: 1, colors: ['#f5f7fa'], emergency: true },
 };
+
+export const EMERGENCY_TYPES = ['fire', 'ambulance', 'police'];
+
+// Boven deze "maximumsnelheid" wordt de snelweg een Autobahn: geen limiet, betonnen weg en
+// sportwagens op de snelle stroken.
+export const AUTOBAHN_ABOVE = 130;
 
 // Rijstroken. Bovenste rijbaan rijdt naar links, onderste naar rechts (rechts rijden):
 // de langzame strook ligt aan de buitenkant, de snelle strook tegen de middenberm.
+// autobahnMix: verkeer op de Autobahn (anders gewoon mix).
 export const LANES = [
   { row: 1, dir: -1, speed: 0.8, mix: { truck: 5, van: 3, car: 3 } },
-  { row: 2, dir: -1, speed: 1.0, mix: { car: 6, van: 3, truck: 1, motor: 1 } },
-  { row: 3, dir: -1, speed: 1.2, mix: { car: 6, motor: 2, van: 1 } },
-  { row: 5, dir: 1, speed: 1.2, mix: { car: 6, motor: 2, van: 1 } },
-  { row: 6, dir: 1, speed: 1.0, mix: { car: 6, van: 3, truck: 1, motor: 1 } },
+  { row: 2, dir: -1, speed: 1.0, mix: { car: 6, van: 3, truck: 1, motor: 1 }, autobahnMix: { car: 6, van: 3, truck: 1, motor: 1, sport: 1 } },
+  { row: 3, dir: -1, speed: 1.2, mix: { car: 6, motor: 2, van: 1 }, autobahnMix: { car: 4, sport: 4, motor: 2, van: 1 } },
+  { row: 5, dir: 1, speed: 1.2, mix: { car: 6, motor: 2, van: 1 }, autobahnMix: { car: 4, sport: 4, motor: 2, van: 1 } },
+  { row: 6, dir: 1, speed: 1.0, mix: { car: 6, van: 3, truck: 1, motor: 1 }, autobahnMix: { car: 6, van: 3, truck: 1, motor: 1, sport: 1 } },
   { row: 7, dir: 1, speed: 0.8, mix: { truck: 5, van: 3, car: 3 } },
 ];
 
@@ -53,20 +66,24 @@ export function levelParams(level, mode = 'normal') {
     // Blind oversteken: rustiger verkeer, ruimere gaten (minstens 1,4 s, standaard 2 s) en
     // de moeilijkheid stijgt maar half zo snel per level.
     const n = Math.max(0, level - 1) * 0.5;
-    return {
+    return withAutobahn({
       baseSpeed: Math.min(1.5 + 0.3 * n, 4.0),
       minGapTime: Math.max(2.0 - 0.06 * n, 1.4),
       maxGapTime: Math.max(4.2 - 0.2 * n, 2.6),
       speedLimit: 70 + 10 * level,
-    };
+    });
   }
   const n = Math.max(0, level - 1);
-  return {
+  return withAutobahn({
     baseSpeed: Math.min(2.0 + 0.4 * n, 6.0),
     minGapTime: Math.max(1.4 - 0.07 * n, 0.9),
     maxGapTime: Math.max(3.4 - 0.25 * n, 1.7),
     speedLimit: 70 + 10 * level, // getoond op het matrixbord
-  };
+  });
+}
+
+function withAutobahn(params) {
+  return { ...params, autobahn: params.speedLimit > AUTOBAHN_ABOVE };
 }
 
 // Score

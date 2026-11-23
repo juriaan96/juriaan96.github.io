@@ -13,7 +13,14 @@ const ENGINES = {
   van: { freq: 62, wave: 'sawtooth', lp: 560, noise: 700, noiseGain: 0.4, gain: 0.55 },
   truck: { freq: 36, wave: 'sawtooth', lp: 320, noise: 220, noiseGain: 0.7, gain: 0.85, sub: true },
   motor: { freq: 150, wave: 'sawtooth', lp: 2000, noise: 2400, noiseGain: 0.25, gain: 0.45, tremolo: 24 },
+  sport: { freq: 105, wave: 'sawtooth', lp: 1500, noise: 1700, noiseGain: 0.3, gain: 0.6 }, // fel en hoog
+  // Hulpdiensten: motor + tweetoonsirene (lo/hi in Hz, rate = wisselingen per seconde / 2)
+  fire: { freq: 42, wave: 'sawtooth', lp: 380, noise: 260, noiseGain: 0.6, gain: 0.8, sub: true, siren: { lo: 440, hi: 587, rate: 0.75 } },
+  ambulance: { freq: 64, wave: 'sawtooth', lp: 560, noise: 700, noiseGain: 0.4, gain: 0.55, siren: { lo: 554, hi: 740, rate: 0.9 } },
+  police: { freq: 80, wave: 'sawtooth', lp: 750, noise: 950, noiseGain: 0.35, gain: 0.5, siren: { lo: 660, hi: 880, rate: 1.3 } },
 };
+
+const SIREN_RANGE = 60; // een sirene hoor je van ver (vakjes)
 
 const SMOOTH = 0.05; // tijdconstante (s) voor vloeiende parameterwijzigingen
 const HEAR_RANGE = 9; // voertuigen verder dan dit (in vakjes, horizontaal) krijgen geen stem
@@ -67,6 +74,10 @@ export class AudioEngine {
     this.engines = ctx.createGain();
     this.engines.gain.value = 0;
     this.engines.connect(this.master);
+    // Sirenes apart: ook in de normale modus (waar motoren zacht zijn) goed te horen
+    this.sirens = ctx.createGain();
+    this.sirens.gain.value = 0;
+    this.sirens.connect(this.master);
 
     // Gedeelde witte ruis (2 s, loopt rond)
     const len = ctx.sampleRate * 2;
@@ -219,6 +230,7 @@ export class AudioEngine {
     if (level !== this.engineLevel) {
       this.engineLevel = level;
       this.engines.gain.setTargetAtTime(level, now, 0.15);
+      this.sirens.gain.setTargetAtTime(level > 0 ? 0.9 : 0, now, 0.15);
     }
     if (level === 0 || !listener || !this.ready) {
       if (this.voices.size && level === 0) this.stopAll();
@@ -229,7 +241,7 @@ export class AudioEngine {
     for (const lane of traffic.lanes) {
       for (const v of lane.vehicles) {
         const dx = v.x + v.length / 2 - listener.x;
-        if (Math.abs(dx) > HEAR_RANGE + v.length / 2) continue;
+        if (Math.abs(dx) > (v.emergency ? SIREN_RANGE : HEAR_RANGE) + v.length / 2) continue;
         alive.add(v);
         let voice = this.voices.get(v);
         if (!voice) {
@@ -306,11 +318,37 @@ export class AudioEngine {
     if (out) gain.connect(out).connect(bus);
     else gain.connect(bus);
 
+    // Tweetoonsirene: een blokgolf-LFO laat de toon wisselen tussen lo en hi
+    let siren = null;
+    if (spec.siren && this.sirens) {
+      const { lo, hi, rate } = spec.siren;
+      const sOsc = ctx.createOscillator();
+      sOsc.type = 'square';
+      sOsc.frequency.value = (lo + hi) / 2;
+      const lfo = ctx.createOscillator();
+      lfo.type = 'square';
+      lfo.frequency.value = rate;
+      const depth = ctx.createGain();
+      depth.gain.value = (hi - lo) / 2;
+      lfo.connect(depth).connect(sOsc.frequency);
+      const tone = ctx.createBiquadFilter();
+      tone.type = 'lowpass';
+      tone.frequency.value = 2400;
+      const sGain = ctx.createGain();
+      sGain.gain.value = 0.0001;
+      const sPan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      sOsc.connect(tone).connect(sGain);
+      if (sPan) sGain.connect(sPan).connect(this.sirens);
+      else sGain.connect(this.sirens);
+      sources.push(sOsc, lfo);
+      siren = { osc: sOsc, gain: sGain, pan: sPan };
+    }
+
     for (const s of sources) {
       if (s === noise) s.start(now, Math.random() * 1.8);
       else s.start(now);
     }
-    return { spec, detune, sources, osc, lp, gain, pan: out, bp };
+    return { spec, detune, sources, osc, lp, gain, pan: out, bp, siren };
   }
 
   steer(voice, v, lane, dx, listener, now) {
@@ -331,6 +369,13 @@ export class AudioEngine {
     voice.lp.frequency.setTargetAtTime(spec.lp * muffle * doppler, now, SMOOTH);
     voice.bp.frequency.setTargetAtTime(spec.noise * muffle * doppler, now, SMOOTH);
     if (voice.pan) voice.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, dx / 5)), now, SMOOTH);
+    if (voice.siren) {
+      // Van ver al hoorbaar, dichtbij hard; hoger als hij nadert (doppler)
+      const s = voice.siren;
+      s.gain.gain.setTargetAtTime(Math.max(0.0001, 0.45 / (1 + (dist / 8) ** 2)), now, SMOOTH);
+      s.osc.detune.setTargetAtTime(1200 * Math.log2(doppler), now, SMOOTH);
+      if (s.pan) s.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, dx / 6)), now, SMOOTH);
+    }
   }
 
   release(voice, now) {

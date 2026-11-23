@@ -9,6 +9,7 @@ import {
   FINISH_POINTS_PER_LEVEL,
   TIME_BONUS_WINDOW,
   TIME_BONUS_PER_SECOND,
+  levelParams,
 } from './config.js';
 import { Traffic } from './traffic.js';
 import { Player } from './player.js';
@@ -25,6 +26,9 @@ const MAX_QUEUED_MOVES = 2;
 const DUEL_HIT_PAUSE = 1.0; // samen spelen: zo lang ligt een geraakte speler plat
 const DUEL_WIN_PAUSE = 1.8; // feestje voordat het winnaarsscherm komt
 const DUEL_START_COLS = [3, 9];
+// Zware voertuigen drukken je plat; lichte laten je wegtollen
+const HEAVY = ['truck', 'van', 'fire', 'ambulance'];
+export const MAX_LEVEL = 30;
 
 /**
  * Spelstatus: 'ready' | 'playing' | 'hit' | 'levelclear' | 'gameover' | 'duelwon' | 'duelover'.
@@ -112,6 +116,8 @@ export class Game {
   newGame(mode = 'normal', opts = {}) {
     this.mode = mode;
     this.level = opts.level || 1;
+    // Oefenen: level gekozen of overgeslagen; telt niet voor de highscores
+    this.practice = !!opts.practice;
     if (mode === 'duel') {
       this.players = [this.player, this.player2];
       DUEL_START_COLS.forEach((col, i) => (this.players[i].startCol = col));
@@ -138,13 +144,26 @@ export class Game {
     this.moves = [];
     this.hitBy = null;
     this.state = 'playing';
-    this.setMessage(
-      this.mode === 'duel'
-        ? { title: 'Klaar? Lopen!', text: 'Wie het eerst aan de overkant is, wint', toast: true }
-        : { title: `Level ${this.level}`, text: `Maximaal ${this.params.speedLimit} km/u`, toast: true },
-      LEVEL_BANNER,
-    );
+    this.setMessage(this.levelMessage(), LEVEL_BANNER);
     this.onEvent('levelstart', { level: this.level });
+  }
+
+  levelMessage() {
+    if (this.mode === 'duel') {
+      return {
+        title: 'Klaar? Lopen!',
+        text: `Wie het eerst aan de overkant is, wint${this.params.autobahn ? ' · Autobahn!' : ''}`,
+        toast: true,
+      };
+    }
+    if (!this.params.autobahn) {
+      return { title: `Level ${this.level}`, text: `Maximaal ${this.params.speedLimit} km/u`, toast: true };
+    }
+    // Eerste level boven de limiet: welkom op de Autobahn
+    const first = this.level <= 1 || !levelParams(this.level - 1, this.mode).autobahn;
+    return first
+      ? { title: 'Welkom op de Autobahn!', text: `Level ${this.level} · geen snelheidslimiet`, toast: true }
+      : { title: `Level ${this.level}`, text: 'Autobahn · geen snelheidslimiet', toast: true };
   }
 
   // --- Invoer -------------------------------------------------------------
@@ -160,6 +179,16 @@ export class Game {
 
   get active() {
     return this.state === 'playing' || this.state === 'hit' || this.state === 'levelclear';
+  }
+
+  /** Snelkoppeling: direct naar een ander level (telt daarna niet meer voor de highscores). */
+  jumpLevel(delta) {
+    if (this.mode === 'duel' || this.paused || !this.active) return;
+    const level = Math.min(MAX_LEVEL, Math.max(1, this.level + delta));
+    if (level === this.level) return;
+    this.level = level;
+    this.practice = true;
+    this.startLevel();
   }
 
   togglePause() {
@@ -296,7 +325,7 @@ export class Game {
       const vehicle = this.traffic.hitTest(p.row, xMin, xMax);
       if (vehicle) {
         p.hitTimer = p.hitDuration = DUEL_HIT_PAUSE;
-        p.hitStyle = vehicle.type === 'truck' || vehicle.type === 'van' ? 'flat' : 'spin';
+        p.hitStyle = HEAVY.includes(vehicle.type) ? 'flat' : 'spin';
         const lane = this.traffic.laneByRow.get(p.row);
         p.hitDir = lane ? lane.dir : 1;
         queue.length = 0;
@@ -322,7 +351,7 @@ export class Game {
     this.timer = this.mode === 'noncha' ? NONCHA_REVEAL : HIT_PAUSE;
     this.hitDuration = this.timer;
     // Aanrijdingseffect: zwaar voertuig = plat als een pannenkoek, licht voertuig = wegtollen.
-    this.hitStyle = vehicle.type === 'truck' || vehicle.type === 'van' ? 'flat' : 'spin';
+    this.hitStyle = HEAVY.includes(vehicle.type) ? 'flat' : 'spin';
     const lane = this.traffic.laneByRow.get(this.player.row);
     this.hitDir = lane ? lane.dir : 1;
     this.moves = [];
@@ -344,7 +373,7 @@ export class Game {
     this.moves = [];
     this.setMessage(null);
     this.onEvent('gameover');
-    this.onGameOver({ mode: this.mode, score: this.score, level: this.level });
+    this.onGameOver({ mode: this.mode, score: this.score, level: this.level, practice: this.practice });
   }
 
   levelClear() {

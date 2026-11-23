@@ -17,7 +17,60 @@ const C = {
   glassRear: '#7fa8c4',
   headlight: '#fff6c2',
   taillight: '#ff3b3b',
+  // Autobahn: lichte betonplaten met voegen
+  concrete: '#9c9e9c',
+  concreteDark: '#8f918f',
+  concreteLight: '#a9aba9',
+  joint: 'rgba(30, 30, 30, 0.28)',
 };
+
+/** Duits bord "einde snelheidsbeperking": witte cirkel met schuine strepen (in een vierkant van 1 × 1). */
+export function paintUnlimited(ctx, cx, cy, r, lineWidth) {
+  ctx.save();
+  ctx.strokeStyle = '#f5f5f5';
+  ctx.lineWidth = lineWidth;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - lineWidth, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.lineWidth = lineWidth * 0.75;
+  for (let i = -2; i <= 2; i++) {
+    const o = i * r * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(cx + o + r, cy - r);
+    ctx.lineTo(cx + o - r, cy + r);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Autobahn-symbool (weg onder een viaduct), wit, gecentreerd op (cx, cy) met grootte s. */
+export function paintAutobahnSymbol(ctx, cx, cy, s, color = '#ffffff') {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(cx - 0.42 * s, cy + 0.48 * s);
+  ctx.lineTo(cx - 0.07 * s, cy - 0.18 * s);
+  ctx.lineTo(cx + 0.07 * s, cy - 0.18 * s);
+  ctx.lineTo(cx + 0.42 * s, cy + 0.48 * s);
+  ctx.closePath();
+  ctx.fill();
+  // Middenberm (uitgespaard) en viaduct
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.moveTo(cx - 0.04 * s, cy + 0.48 * s);
+  ctx.lineTo(cx, cy - 0.1 * s);
+  ctx.lineTo(cx + 0.04 * s, cy + 0.48 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillRect(cx - 0.5 * s, cy - 0.4 * s, s, 0.13 * s);
+  ctx.fillRect(cx - 0.5 * s, cy - 0.4 * s, 0.1 * s, 0.35 * s);
+  ctx.fillRect(cx + 0.4 * s, cy - 0.4 * s, 0.1 * s, 0.35 * s);
+  ctx.restore();
+}
 
 function seeded(seed) {
   return () => {
@@ -76,6 +129,14 @@ export class Renderer {
     this.drawBackground(this.bg.getContext('2d'));
   }
 
+  /** De achtergrond opnieuw tekenen als de weg verandert (Autobahn of niet). */
+  syncBackground(game) {
+    const autobahn = !!game.params.autobahn;
+    if (autobahn === !!this.autobahn) return;
+    this.autobahn = autobahn;
+    this.drawBackground(this.bg.getContext('2d'));
+  }
+
   /** Schermpositie → positie op het speelveld (in vakjes). */
   screenToGrid(clientX, clientY) {
     const r = this.canvas.getBoundingClientRect();
@@ -99,12 +160,22 @@ export class Renderer {
       }
     }
 
+    // Gewone snelweg: asfalt. Autobahn: lichte betonplaten met dwarsvoegen.
+    const ab = !!this.autobahn;
+    const road = ab ? C.concrete : C.asphalt;
     for (const top of [ROW_FINISH + 1, ROW_MEDIAN + 1]) {
-      ctx.fillStyle = C.asphalt;
+      ctx.fillStyle = road;
       ctx.fillRect(0, top, COLS, 3);
       for (let i = 0; i < COLS * 40; i++) {
-        ctx.fillStyle = rnd() < 0.5 ? C.asphaltDark : C.asphaltLight;
+        if (ab) ctx.fillStyle = rnd() < 0.5 ? C.concreteDark : C.concreteLight;
+        else ctx.fillStyle = rnd() < 0.5 ? C.asphaltDark : C.asphaltLight;
         ctx.fillRect(rnd() * COLS, top + rnd() * 3, 0.04, 0.04);
+      }
+      if (ab) {
+        ctx.fillStyle = C.joint;
+        for (let lane = 0; lane < 3; lane++) {
+          for (let x = 0.4 + lane * 0.55; x < COLS; x += 1.65) ctx.fillRect(x, top + lane, 0.025, 1);
+        }
       }
       // Doorgetrokken kantstrepen en onderbroken rijstrookstrepen.
       ctx.fillStyle = C.line;
@@ -117,7 +188,7 @@ export class Renderer {
 
     // Middenberm: smalle asfaltstrook, gras en een vangrail.
     const m = ROW_MEDIAN;
-    ctx.fillStyle = C.asphalt;
+    ctx.fillStyle = road;
     ctx.fillRect(0, m, COLS, 1);
     ctx.fillStyle = C.grass;
     ctx.fillRect(0, m + 0.18, COLS, 0.64);
@@ -141,6 +212,8 @@ export class Renderer {
 
   draw(game, dt = 1 / 60) {
     const ctx = this.ctx;
+    this.time = (this.time || 0) + dt;
+    this.syncBackground(game);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (game.blind) {
       // Noncha mode: volledig zwart, geen auto's, strepen of speler.
@@ -242,20 +315,30 @@ export class Renderer {
     const mx = 0.15;
     const my = ROW_MEDIAN + 0.08;
     fillRound(ctx, mx, my, 0.84, 0.84, 0.08, '#111');
-    ctx.strokeStyle = '#e0262b';
-    ctx.lineWidth = 0.07;
-    ctx.beginPath();
-    ctx.arc(mx + 0.42, my + 0.42, 0.31, 0, Math.PI * 2);
-    ctx.stroke();
-    const limit = String(game.params.speedLimit);
-    this.text(limit, mx + 0.42, my + 0.44, limit.length > 2 ? 0.22 : 0.28, '#f5f5f5');
+    if (game.params.autobahn) {
+      // Autobahn: geen limiet (Duits bord "einde snelheidsbeperking")
+      paintUnlimited(ctx, mx + 0.42, my + 0.42, 0.29, 0.045);
+    } else {
+      ctx.strokeStyle = '#e0262b';
+      ctx.lineWidth = 0.07;
+      ctx.beginPath();
+      ctx.arc(mx + 0.42, my + 0.42, 0.31, 0, Math.PI * 2);
+      ctx.stroke();
+      const limit = String(game.params.speedLimit);
+      this.text(limit, mx + 0.42, my + 0.44, limit.length > 2 ? 0.22 : 0.28, '#f5f5f5');
+    }
 
-    // Blauw bord op de finishberm.
+    // Blauw bord op de finishberm (op de Autobahn met het Autobahn-symbool).
     const bx = COLS - 2.6;
     const by = ROW_FINISH + 0.14;
     fillRound(ctx, bx, by, 2.4, 0.72, 0.08, '#f5f5f5');
     fillRound(ctx, bx + 0.05, by + 0.05, 2.3, 0.62, 0.06, '#1f4fa0');
-    this.text('Overkant', bx + 1.2, by + 0.37, 0.34, '#ffffff');
+    if (game.params.autobahn) {
+      paintAutobahnSymbol(ctx, bx + 0.38, by + 0.37, 0.44);
+      this.text('Overkant', bx + 1.38, by + 0.37, 0.3, '#ffffff');
+    } else {
+      this.text('Overkant', bx + 1.2, by + 0.37, 0.34, '#ffffff');
+    }
   }
 
   drawVehicle(v, lane) {
@@ -274,10 +357,120 @@ export class Renderer {
       case 'motor':
         this.drawMotor(v, L);
         break;
+      case 'sport':
+        this.drawSport(v, L);
+        break;
+      case 'fire':
+        this.drawFire(v, L);
+        break;
+      case 'ambulance':
+        this.drawCar(v, L, 0.72, true);
+        this.drawChecks(L, 0.72, '#1f4fa0');
+        this.drawLightBar(v, L / 2 - 0.75, 0.5);
+        break;
+      case 'police':
+        this.drawCar(v, L, 0.62, false);
+        this.drawPoliceStripes(L, 0.62);
+        this.drawLightBar(v, -0.1, 0.44);
+        break;
       default:
         this.drawCar(v, L, 0.62, false);
     }
     ctx.restore();
+  }
+
+  /** Sportwagen (Autobahn): laag, breed, met strepen en een spoiler. */
+  drawSport(v, L) {
+    const ctx = this.ctx;
+    const h = 0.6;
+    const x0 = -L / 2;
+    const y0 = -h / 2;
+    fillRound(ctx, x0 + 0.05, y0 + 0.07, L, h, 0.22, C.shadow);
+    fillRound(ctx, x0, y0, L, h, 0.22, v.color);
+    const light = v.color === '#e5e7eb' || v.color === '#facc15' || v.color === '#84cc16';
+    ctx.fillStyle = light ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.8)';
+    ctx.fillRect(x0 + 0.08, -0.08, L - 0.16, 0.05);
+    ctx.fillRect(x0 + 0.08, 0.03, L - 0.16, 0.05);
+    fillRound(ctx, -0.05, y0 + 0.1, 0.32, h - 0.2, 0.08, C.glass); // lage voorruit
+    fillRound(ctx, x0 + 0.38, y0 + 0.1, 0.34, h - 0.2, 0.06, 'rgba(0,0,0,0.35)');
+    ctx.fillStyle = '#1b1d21';
+    ctx.fillRect(x0 + 0.02, y0 + 0.04, 0.09, h - 0.08); // spoiler
+    ctx.fillStyle = C.headlight;
+    ctx.fillRect(L / 2 - 0.06, y0 + 0.06, 0.06, 0.1);
+    ctx.fillRect(L / 2 - 0.06, -y0 - 0.16, 0.06, 0.1);
+    ctx.fillStyle = C.taillight;
+    ctx.fillRect(x0, y0 + 0.08, 0.04, 0.1);
+    ctx.fillRect(x0, -y0 - 0.18, 0.04, 0.1);
+  }
+
+  /** Brandweerauto: rood, met ladder op het dak en zwaailichten. */
+  drawFire(v, L) {
+    const ctx = this.ctx;
+    const h = 0.8;
+    const x0 = -L / 2;
+    const y0 = -h / 2;
+    fillRound(ctx, x0 + 0.06, y0 + 0.08, L, h, 0.1, C.shadow);
+    fillRound(ctx, x0, y0, L, h, 0.1, v.color);
+    // Ladder
+    ctx.fillStyle = '#d4d8de';
+    ctx.fillRect(x0 + 0.1, -0.17, L - 0.95, 0.05);
+    ctx.fillRect(x0 + 0.1, 0.12, L - 0.95, 0.05);
+    for (let x = x0 + 0.15; x < L / 2 - 0.85; x += 0.18) ctx.fillRect(x, -0.17, 0.03, 0.34);
+    // Witte streep en cabine
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillRect(x0, y0 + 0.02, L, 0.05);
+    ctx.fillRect(x0, -y0 - 0.07, L, 0.05);
+    fillRound(ctx, L / 2 - 0.3, y0 + 0.1, 0.18, h - 0.2, 0.05, C.glass);
+    ctx.fillStyle = C.headlight;
+    ctx.fillRect(L / 2 - 0.05, y0 + 0.08, 0.05, 0.12);
+    ctx.fillRect(L / 2 - 0.05, -y0 - 0.2, 0.05, 0.12);
+    this.drawLightBar(v, L / 2 - 0.55, 0.6);
+  }
+
+  /** Ambulance: blokjespatroon langs de randen. */
+  drawChecks(L, h, color) {
+    const ctx = this.ctx;
+    const y0 = -h / 2;
+    ctx.fillStyle = color;
+    for (let i = 0, x = -L / 2 + 0.08; x < L / 2 - 0.5; x += 0.16, i++) {
+      if (i % 2) continue;
+      ctx.fillRect(x, y0 + 0.01, 0.16, 0.07);
+      ctx.fillRect(x, -y0 - 0.08, 0.16, 0.07);
+    }
+  }
+
+  /** Politie: blauwe en oranje strepen schuin over de motorkap. */
+  drawPoliceStripes(L, h) {
+    const ctx = this.ctx;
+    const y0 = -h / 2;
+    ctx.fillStyle = '#1d4ed8';
+    ctx.fillRect(-L / 2 + 0.05, y0 + 0.02, L - 0.1, 0.06);
+    ctx.fillRect(-L / 2 + 0.05, -y0 - 0.08, L - 0.1, 0.06);
+    ctx.fillStyle = '#f97316';
+    ctx.fillRect(-L / 2 + 0.05, y0 + 0.08, L - 0.1, 0.03);
+    ctx.fillRect(-L / 2 + 0.05, -y0 - 0.11, L - 0.1, 0.03);
+  }
+
+  /** Blauwe zwaailichten op het dak, om en om knipperend. */
+  drawLightBar(v, x, w) {
+    const ctx = this.ctx;
+    const phase = Math.floor((this.time || 0) * 7 + v.x * 0.37) % 2;
+    ctx.fillStyle = '#1b1d21';
+    ctx.fillRect(x - 0.07, -w / 2, 0.14, w);
+    for (const [side, on] of [
+      [-1, phase === 0],
+      [1, phase === 1],
+    ]) {
+      const y = (side * w) / 4;
+      if (on) {
+        ctx.fillStyle = 'rgba(96, 165, 250, 0.45)';
+        ctx.beginPath();
+        ctx.arc(x, y, 0.28, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = on ? '#bfdbfe' : '#1e3a8a';
+      ctx.fillRect(x - 0.06, y - w / 4 + 0.02, 0.12, w / 2 - 0.04);
+    }
   }
 
   drawCar(v, L, h, isVan) {

@@ -18,7 +18,7 @@
 
 import { COLS, ROWS, ROW_MEDIAN } from './config.js';
 import { drawCharacter } from './character.js';
-import { PLAYER_COLORS } from './render.js';
+import { PLAYER_COLORS, paintUnlimited, paintAutobahnSymbol } from './render.js';
 
 // Camera kijkt zo schuin naar beneden: liggend schuin, staand (telefoon) steiler, zodat het
 // smalle scherm beter gevuld wordt.
@@ -516,10 +516,25 @@ export class Renderer3D {
     });
   }
 
+  get glow() {
+    return this.canvasTex('glow', 64, 64, (ctx) => {
+      const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 32);
+      g.addColorStop(0, 'rgba(191,219,254,0.95)');
+      g.addColorStop(0.35, 'rgba(96,165,250,0.55)');
+      g.addColorStop(1, 'rgba(59,130,246,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 64, 64);
+    });
+  }
+
   speedSign(limit) {
     return this.canvasTex(`speed:${limit}`, 128, 128, (ctx) => {
       ctx.fillStyle = '#111';
       ctx.fillRect(0, 0, 128, 128);
+      if (limit === 'unlimited') {
+        paintUnlimited(ctx, 64, 64, 46, 7); // Autobahn: geen limiet
+        return;
+      }
       ctx.strokeStyle = '#e0262b';
       ctx.lineWidth = 9;
       ctx.beginPath();
@@ -532,8 +547,11 @@ export class Renderer3D {
 
   // --- Vaste omgeving ------------------------------------------------------------------
 
-  buildStatic() {
+  /** @param {boolean} autobahn  betonnen weg met voegen in plaats van asfalt */
+  buildStatic(autobahn = false) {
     const b = this.static;
+    b.reset();
+    this.builtAutobahn = autobahn;
     const X0 = -60;
     const X1 = COLS + 60;
     const W = X1 - X0;
@@ -542,12 +560,19 @@ export class Renderer3D {
     const grass = rgb('#5a9443');
     const grassDark = rgb('#4b8037');
     const grassLight = rgb('#6aa452');
-    const asphalt = rgb('#45484e');
+    const asphalt = rgb(autobahn ? '#a3a5a3' : '#45484e');
     const line = rgb('#f3f3ee');
 
     b.box(XC, -0.2, 0, W, 0.2, 140, grass); // de grond
     for (const top of [1, ROW_MEDIAN + 1]) {
       b.box(XC, 0, top + 1.5, W, 0.01, 3, asphalt);
+      if (autobahn) {
+        // Betonplaten: dwarsvoegen per rijstrook, verspringend
+        const joint = rgb('#7f817f');
+        for (let lane = 0; lane < 3; lane++) {
+          for (let x = -20 + lane * 0.55; x < COLS + 20; x += 1.65) b.box(x, 0.01, top + lane + 0.5, 0.03, 0.002, 0.98, joint);
+        }
+      }
       // Doorgetrokken kantstrepen en onderbroken rijstrookstrepen
       b.box(XC, 0.01, top + 0.065, W, 0.004, 0.05, line);
       b.box(XC, 0.01, top + 3 - 0.065, W, 0.004, 0.05, line);
@@ -719,6 +744,11 @@ export class Renderer3D {
     }
 
     this.updateCamera(game, dt);
+    const autobahn = !!game.params.autobahn;
+    if (autobahn !== this.builtAutobahn) {
+      this.buildStatic(autobahn);
+      this.static.upload();
+    }
     gl.clearColor(FOG[0], FOG[1], FOG[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
@@ -733,6 +763,7 @@ export class Renderer3D {
     this.static.draw(lit);
     const dyn = this.dynamic;
     dyn.reset();
+    this.glows = [];
     for (const lane of game.traffic.lanes) {
       for (const v of lane.vehicles) {
         if (v.x + v.length < -9 || v.x > COLS + 9) continue;
@@ -754,7 +785,7 @@ export class Renderer3D {
     for (const lane of game.traffic.lanes) {
       for (const v of lane.vehicles) {
         if (v.x + v.length < -9 || v.x > COLS + 9) continue;
-        const w = v.type === 'motor' ? 0.4 : v.type === 'truck' ? 1.0 : 0.9;
+        const w = v.type === 'motor' ? 0.4 : v.type === 'truck' || v.type === 'fire' ? 1.0 : 0.9;
         this.quads.add([v.x + v.length / 2 + 0.08, 0.015, lane.row + 0.56], Rg, Ug, v.length + 0.3, w);
       }
     }
@@ -767,16 +798,28 @@ export class Renderer3D {
     }
     this.drawQuads(tex, this.blob, [1, 1, 1, 1]);
 
-    // Borden: snelheid van dit level en "Overkant"
+    // Blauwe gloed van zwaailichten
+    if (this.glows.length) {
+      const camU = [0, Math.cos(this.pitch), -Math.sin(this.pitch)];
+      for (const g of this.glows) this.quads.add(g, [1, 0, 0], camU, 0.85, 0.85);
+      this.drawQuads(tex, this.glow, [1, 1, 1, 0.9]);
+    }
+
+    // Borden: snelheid van dit level (Autobahn: geen limiet) en "Overkant"
     this.quads.add([0.6, 1.55, 0.356], [1, 0, 0], [0, 1, 0], 0.82, 0.82);
-    this.drawQuads(tex, this.speedSign(game.params.speedLimit), [1, 1, 1, 1]);
+    this.drawQuads(tex, this.speedSign(autobahn ? 'unlimited' : game.params.speedLimit), [1, 1, 1, 1]);
     this.quads.add([COLS - 1.5, 1.28, 0.334], [1, 0, 0], [0, 1, 0], 2.3, 0.66);
     this.drawQuads(
       tex,
-      this.canvasTex('sign:overkant', 256, 74, (ctx, w, h) => {
+      this.canvasTex(autobahn ? 'sign:overkant-ab' : 'sign:overkant', 256, 74, (ctx, w, h) => {
         ctx.fillStyle = '#1f4fa0';
         ctx.fillRect(0, 0, w, h);
-        this.text(ctx, 'Overkant', w / 2, h / 2 + 2, 40, '#ffffff', 700);
+        if (autobahn) {
+          paintAutobahnSymbol(ctx, 40, h / 2, 52);
+          this.text(ctx, 'Overkant', 152, h / 2 + 2, 36, '#ffffff', 700);
+        } else {
+          this.text(ctx, 'Overkant', w / 2, h / 2 + 2, 40, '#ffffff', 700);
+        }
       }),
       [1, 1, 1, 1],
     );
@@ -877,7 +920,7 @@ export class Renderer3D {
     if (!lane) return;
     const fx = this.fx;
     fx.reset();
-    const h = v.type === 'truck' ? 1.25 : v.type === 'van' ? 0.95 : 0.8;
+    const h = v.type === 'truck' || v.type === 'fire' ? 1.25 : v.type === 'van' || v.type === 'ambulance' ? 0.95 : 0.8;
     fx.box(v.x + v.length / 2, 0, lane.row + 0.5, v.length + 0.25, h, 0.95, [1, 0.24, 0.24]);
     fx.upload();
     const pulse = 0.5 + 0.5 * Math.sin(game.time * 10);
@@ -930,6 +973,65 @@ export class Renderer3D {
         wheels([L / 2 - 0.35, -L / 2 + 0.35], 0.62);
         lights(L / 2, -L / 2, 0.24, 0.34, 0.24);
         break;
+      case 'sport': {
+        const light = v.color === '#e5e7eb' || v.color === '#facc15' || v.color === '#84cc16';
+        const stripe = rgb(light ? '#1b1d21' : '#f5f5f5');
+        const dark = rgb('#1b1d21');
+        part(-L / 2, L / 2, 0.08, 0.3, 0.66, color);
+        part(-0.3, 0.28, 0.3, 0.45, 0.5, glass);
+        part(-0.25, 0.18, 0.45, 0.48, 0.5, color); // dak
+        for (const s of [-1, 1]) {
+          part(0.28, L / 2 - 0.02, 0.3, 0.306, 0.06, stripe, s * 0.07);
+          part(-L / 2 + 0.06, -0.08, 0.36, 0.4, 0.05, dark, s * 0.25); // spoilerpootjes
+        }
+        part(-L / 2, -L / 2 + 0.14, 0.4, 0.44, 0.66, dark); // spoiler
+        wheels([L / 2 - 0.3, -L / 2 + 0.32], 0.6, 0.16);
+        lights(L / 2, -L / 2, 0.16, 0.24, 0.22);
+        break;
+      }
+      case 'fire': {
+        const white = rgb('#f5f5f5');
+        const grey = rgb('#c3c8cf');
+        part(-L / 2 + 0.05, L / 2 - 0.05, 0.12, 0.26, 0.6, tyre);
+        part(L / 2 - 0.8, L / 2, 0.15, 0.95, 0.76, color); // cabine
+        part(L / 2 - 0.02, L / 2 + 0.012, 0.55, 0.86, 0.64, glass);
+        part(L / 2 - 0.42, L / 2 - 0.1, 0.58, 0.86, 0.772, glass);
+        part(-L / 2, L / 2 - 0.84, 0.2, 0.9, 0.78, color); // opbouw
+        part(-L / 2, L / 2, 0.42, 0.5, 0.792, white); // witte streep
+        for (const s of [-1, 1]) part(-L / 2 + 0.1, L / 2 - 0.9, 0.9, 0.97, 0.05, grey, s * 0.2); // ladder
+        for (let a = -L / 2 + 0.2; a < L / 2 - 0.95; a += 0.22) part(a, a + 0.04, 0.9, 0.95, 0.4, grey);
+        wheels([L / 2 - 0.35, -L / 2 + 0.4], 0.66, 0.2);
+        lights(L / 2, -L / 2, 0.22, 0.32, 0.27);
+        this.lightBar(b, v, cx + f * (L / 2 - 0.45), 0.95, cz);
+        break;
+      }
+      case 'ambulance': {
+        const blue = rgb('#1f4fa0');
+        part(-L / 2, L / 2, 0.1, 0.8, 0.7, color);
+        part(L / 2 - 0.02, L / 2 + 0.012, 0.44, 0.72, 0.6, glass);
+        part(L / 2 - 0.55, L / 2 - 0.12, 0.48, 0.72, 0.712, glass);
+        // Blokjespatroon langs de zijkant
+        for (let a = -L / 2 + 0.05, i = 0; a < L / 2 - 0.65; a += 0.18, i++) {
+          if (i % 2 === 0) part(a, a + 0.18, 0.28, 0.42, 0.712, blue);
+        }
+        wheels([L / 2 - 0.35, -L / 2 + 0.35], 0.62);
+        lights(L / 2, -L / 2, 0.24, 0.34, 0.24);
+        this.lightBar(b, v, cx + f * (L / 2 - 0.35), 0.8, cz);
+        break;
+      }
+      case 'police': {
+        const blue = rgb('#1d4ed8');
+        const orange = rgb('#f97316');
+        part(-L / 2, L / 2, 0.1, 0.36, 0.62, color);
+        part(-L / 2, L / 2, 0.2, 0.27, 0.632, blue);
+        part(-L / 2, L / 2, 0.27, 0.3, 0.632, orange);
+        part(-L / 2 + 0.3, L / 2 - 0.42, 0.36, 0.56, 0.54, glass);
+        part(-L / 2 + 0.36, L / 2 - 0.5, 0.56, 0.6, 0.56, color);
+        wheels([L / 2 - 0.32, -L / 2 + 0.32], 0.56);
+        lights(L / 2, -L / 2, 0.2, 0.29, 0.21);
+        this.lightBar(b, v, cx - f * 0.05, 0.6, cz);
+        break;
+      }
       case 'motor':
         wheels([0.27, -0.27], 0, 0.2);
         part(-0.36, 0.38, 0.14, 0.3, 0.16, rgb('#2a2d33'));
@@ -943,6 +1045,19 @@ export class Renderer3D {
         part(-L / 2 + 0.36, L / 2 - 0.5, 0.56, 0.6, 0.56, color); // dak
         wheels([L / 2 - 0.32, -L / 2 + 0.32], 0.56);
         lights(L / 2, -L / 2, 0.2, 0.29, 0.21);
+    }
+  }
+
+  /** Blauwe zwaailichten op het dak (om en om), met gloed. */
+  lightBar(b, v, x, y, z) {
+    const phase = Math.floor(this.time * 7 + v.x * 0.37) % 2;
+    b.box(x, y, z, 0.16, 0.04, 0.5, rgb('#1b1d21'));
+    for (const [side, on] of [
+      [-1, phase === 0],
+      [1, phase === 1],
+    ]) {
+      b.box(x, y + 0.04, z + side * 0.13, 0.14, 0.08, 0.2, rgb(on ? '#dbeafe' : '#1e3a8a'));
+      if (on) this.glows.push([x, y + 0.12, z + side * 0.13]);
     }
   }
 

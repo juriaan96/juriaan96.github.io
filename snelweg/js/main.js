@@ -1,5 +1,5 @@
 import { COLS, ROWS } from './config.js';
-import { Game } from './game.js';
+import { Game, MAX_LEVEL } from './game.js';
 import { Renderer } from './render.js';
 import { Renderer3D } from './render3d.js';
 import { Input } from './input.js';
@@ -86,7 +86,7 @@ for (const type of ['pointerdown', 'keydown']) {
 
 // --- Geluid, trillen en meldingen bij spelgebeurtenissen ---------------------------
 
-const VEHICLE_NAMES = { car: 'een auto', van: 'een bestelbus', truck: 'een vrachtwagen', motor: 'een motor' };
+const VEHICLE_NAMES = { car: 'een auto', van: 'een bestelbus', truck: 'een vrachtwagen', motor: 'een motor', sport: 'een sportwagen', fire: 'de brandweer', ambulance: 'een ambulance', police: 'de politie' };
 const ROW_NAMES = ['de overkant', 'rijstrook 6', 'rijstrook 5', 'rijstrook 4', 'de middenberm', 'rijstrook 3', 'rijstrook 2', 'rijstrook 1', 'de startberm'];
 
 /** Links/rechts-positie van de speler voor geluid: -0.8 (links) … 0.8 (rechts). */
@@ -127,7 +127,11 @@ function onGameEvent(type, data = {}) {
   }
   switch (type) {
     case 'levelstart':
-      announce(`Level ${data.level}. Maximaal ${game.params.speedLimit} kilometer per uur.`);
+      announce(
+        game.params.autobahn
+          ? `Level ${data.level}. Autobahn: geen snelheidslimiet.`
+          : `Level ${data.level}. Maximaal ${game.params.speedLimit} kilometer per uur.`,
+      );
       break;
     case 'median':
       announce('Middenberm.');
@@ -282,10 +286,17 @@ function focusFirst(root) {
   if (panel) panel.scrollTop = 0;
 }
 
+// Snelkoppeling: ?level=7 achter de URL begint meteen op dat level (oefenen, geen highscore)
+const startLevelParam = (() => {
+  const n = parseInt(new URLSearchParams(location.search).get('level'), 10);
+  return n >= 1 ? Math.min(MAX_LEVEL, n) : 0;
+})();
+
 function startGame(mode = 'normal') {
   game.player.look = { ...profile.look };
   game.player.face = profile.face || null;
-  game.newGame(mode);
+  if (startLevelParam > 1) game.newGame(mode, { level: startLevelParam, practice: true });
+  else game.newGame(mode);
   game.glimpseEvery = mode === 'noncha' ? settings.nonchaGlimpse : 0;
   show('game');
 }
@@ -587,6 +598,11 @@ window.addEventListener('keydown', (e) => {
     actions.view(); // V: wissel tussen 2D en 3D
     return;
   }
+  if (current === 'game' && (e.code === 'PageUp' || e.code === 'PageDown') && !e.repeat) {
+    e.preventDefault();
+    game.jumpLevel(e.code === 'PageUp' ? 1 : -1); // snelkoppeling naar een ander level
+    return;
+  }
   if (current === 'game') {
     input.handleKey(e);
     return;
@@ -770,11 +786,14 @@ function showGameOver(result) {
   lastSaved = null;
   goScore.textContent = `${result.mode === 'noncha' ? 'Noncha · ' : ''}Score ${result.score} · Level ${result.level}`;
   announce(`Game over. ${goScore.textContent}.`);
-  const canSave = qualifies(result.mode, result.score);
+  const canSave = !result.practice && qualifies(result.mode, result.score);
   goForm.hidden = !canSave;
   goName.maxLength = NAME_MAX_LENGTH;
   goName.value = (profile.name && profile.name.trim()) || settings.lastName;
-  setStatus(goStatus, canSave ? '' : 'Geen highscore deze keer.');
+  setStatus(
+    goStatus,
+    canSave ? '' : result.practice ? 'Oefenpotje (level gekozen): telt niet voor de highscores.' : 'Geen highscore deze keer.',
+  );
   backTarget = 'gameover';
   show('gameover', { focus: false });
   if (canSave) {
