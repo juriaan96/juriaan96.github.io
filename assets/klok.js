@@ -18,6 +18,7 @@ const F = {
   dm: fmt({ day: 'numeric', month: 'long' })
 };
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const heard = K.heard = (msg, name) => name ? msg + '\nHoor je dat? Dat is ' + name + '!' : msg;
 const ymd = s => { const p = s.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); };
 const dayStart = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
@@ -115,7 +116,7 @@ K.H = {
     };
   },
   clock(box, msg, anchor) {
-    return { box, label: 'Klok', egg: 'klok', act(api) { if (api.spin()) { api.chime('bells'); api.say(msg || 'Hé, de klok loopt even op hol!', anchor[0], anchor[1], 3000, anchor[2]); } } };
+    return { box, label: 'Klok', egg: 'klok', act(api) { if (api.spin()) { api.say(heard(msg || 'Hé, de klok loopt even op hol!', api.chime('famous')), anchor[0], anchor[1], 4500, anchor[2]); } } };
   },
   rain(box, label, kind, egg, firstMsg, rainMsg, anchor) {
     let taps = [];
@@ -332,29 +333,36 @@ function run(T, auto, base) {
     return t;
   }
   const CHIMES = [
-    { name: 'Big Ben', play(n, out) { const t = melody([1, 2, 3, 4], 1, 0.75, 0.32, out); for (let i = 0; i < n; i++) bigBell(t + 1.2 + i * 2.6, NOTE.E3, 0.42, out, 6); } },
+    { name: 'Big Ben', play(n, out, short) { const t = melody(short ? [3, 4] : [1, 2, 3, 4], 1, 0.75, 0.32, out); for (let i = 0; i < n; i++) bigBell(t + 1.2 + i * 2.6, NOTE.E3, 0.42, out, 6); } },
     { name: 'de kerkklok', play(n, out) { for (let i = 0; i < n; i++) bigBell(i * 2.2, 196, 0.38, out, 5); } },
     { name: 'de koekoeksklok', play(n, out) { for (let i = 0; i < n; i++) { tone(i * 1.1, 740, 0.3, 0.35, out); tone(i * 1.1 + 0.38, 587, 0.3, 0.5, out); } } },
-    { name: 'de staande klok', play(n, out) { const t = melody([1, 2], 2, 0.5, 0.2, out); for (let i = 0; i < n; i++) bell(t + 0.8 + i * 1.5, 330, 0.3, out); } },
+    { name: 'de staande klok', play(n, out, short) { const t = melody(short ? [1] : [1, 2], 2, 0.5, 0.2, out); for (let i = 0; i < n; i++) bell(t + 0.8 + i * 1.5, 330, 0.3, out); } },
     { name: 'de beiaard', play(n, out) {
       const tune = ['C5', 'E5', 'G5', 'C6', 'A5', 'G5', 'E5', 'D5', 'E5', 'G5', 'C5'];
       tune.forEach((nm, i) => bell(i * 0.28 + (i === tune.length - 1 ? 0.3 : 0), NOTE[nm], 0.16, out));
       for (let i = 0; i < n; i++) bell(3.8 + i * 1.6, 262, 0.3, out);
-    } }
+    } },
+    { name: 'de scheepsbel', play(n, out) { for (let i = 0; i < n; i++) bell(Math.floor(i / 2) * 1.4 + (i % 2) * 0.35, 1180, 0.22, out); } },
+    { name: 'de wekker', onlyClick: true, play(n, out) { for (let i = 0; i < 24; i++) tone(i * 0.09, i % 2 ? 2350 : 2650, 0.12, 0.08, out, null, 'square'); } }
   ];
-  let lastChime = -1;
+  let lastChime = -1, clickG = null;
   const testChime = /[?&]uurslag/.test(location.search);
-  function famousChime(n, out) {
+  function famousChime(n, out, short) {
     let i = Math.floor(R() * CHIMES.length);
-    if (i === lastChime) i = (i + 1) % CHIMES.length;
+    while (i === lastChime || (!short && CHIMES[i].onlyClick)) i = (i + 1) % CHIMES.length;
     lastChime = i;
-    CHIMES[i].play(n, out);
+    CHIMES[i].play(n, out, short);
     return CHIMES[i].name;
   }
   function chime(kind) {
     try {
       initAudio();
       const p = ac.resume(); if (p && p.catch) p.catch(() => {});
+      if (kind === 'famous') {
+        if (clickG) clickG.gain.setTargetAtTime(0, ac.currentTime, 0.05);
+        clickG = ac.createGain(); clickG.connect(fx);
+        return famousChime(2, clickG, true);
+      }
       if (kind === 'bells') { bell(0, 784, 0.22, fx); bell(0.4, 659, 0.22, fx); bell(0.8, 523, 0.22, fx); bell(1.2, 392, 0.22, fx); }
       else if (kind === 'cuckoo') { for (let i = 0; i < 2; i++) { tone(i * 0.9, 740, 0.3, 0.35, fx); tone(i * 0.9 + 0.38, 587, 0.3, 0.5, fx); } }
       else if (kind === 'chirp') { tone(0, 3200, 0.12, 0.09, fx, 4600); tone(0.14, 3400, 0.12, 0.09, fx, 4800); tone(0.28, 3000, 0.1, 0.12, fx, 4200); }

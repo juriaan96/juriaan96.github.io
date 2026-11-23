@@ -278,7 +278,7 @@ addTheme({
   hits: [
     H.fire(),
     H.say([218, 318, 64, 104], 'Lantaarn', 'lantaarn', ['Lantaarn uit. Nu alleen het haardvuur nog.', 'Lantaarn weer aan.'], [250, 320, 'l'], 2800, (api, i) => { ['lanternGlow', 'lanternFlame'].forEach(id => api.show(id, i !== 0)); const g = api.$('lanternGlass'); if (g) g.setAttribute('opacity', i === 0 ? '.15' : '.55'); }),
-    { box: [388, 40, 224, 380], label: 'Koekoeksklok', egg: 'koekoek', act(api) { api.flash('cuckoo', 'pop', 2000); api.chime('cuckoo'); api.say('Koekoek! Koekoek!', 600, 160, 2500, 'l'); } },
+    { box: [388, 40, 224, 380], label: 'Koekoeksklok', egg: 'koekoek', act(api) { api.flash('cuckoo', 'pop', 2000); api.say(K.heard('Het vogeltje komt kijken!', api.chime('famous')), 600, 160, 4500, 'l'); } },
     H.say([646, 350, 70, 70], 'Chocolademelk', 'mok', ['Warme chocolademelk na een dag in de sneeuw.', 'Met een marshmallow erin!'], [680, 352, 'r'], 3000),
     H.say([828, 590, 150, 300], 'Sneeuwschoenen', 'schoenen', ['Met sneeuwschoenen zak je niet weg in de sneeuw.', 'Morgen een tocht door het bos?'], [850, 600, 'r'], 3500),
     H.say([205, 800, 120, 90], 'Laarzen', 'laarzen', ['Nog nat van de sneeuw.', 'Laarzen uit bij de deur, dat is de regel in de blokhut.'], [262, 795, 'l'], 3200),
@@ -324,7 +324,7 @@ addTheme({
   hits: [
     H.fire(),
     cand(0, 345, 366, 'l'), cand(1, 630, 376, 'r'),
-    { box: [414, 80, 172, 348], label: 'Klok met vogel', egg: 'klok', act(api) { if (api.spin()) { api.chime('chirp'); api.say('Tjilp! Het vogeltje laat de klok rondjes draaien.', 590, 300, 3000, 'l'); } } },
+    { box: [414, 80, 172, 348], label: 'Klok met vogel', egg: 'klok', act(api) { if (api.spin()) { api.say(K.heard('Tjilp! Het vogeltje laat de klok rondjes draaien.', api.chime('famous')), 590, 300, 4500, 'l'); } } },
     H.say([680, 330, 64, 96], 'Vogelhuisje', 'vogel', ['Kijk, er woont iemand!', 'Weer naar binnen gevlogen.'], [712, 340, 'r'], 2800, (api, i) => { api.show('peek', i === 0); if (i === 0) api.chime('chirp'); }),
     H.say([212, 318, 80, 108], 'Tulpen', 'tulp', ['Verse tulpen van de markt.', 'Rood, geel en roze: echt Hollands.', 'Niet vergeten: water geven!'], [250, 320, 'l'], 3000),
     H.say([205, 800, 120, 90], 'Laarzen', 'laarzen', ['Regenlaarzen: april doet wat hij wil.', 'Plassen springen kan altijd.'], [262, 795, 'l'], 3200),
@@ -406,7 +406,7 @@ addTheme({
   },
   hits: [
     H.fire(),
-    { box: [408, 118, 184, 184], label: 'Maanklok', egg: 'klok', act(api) { if (api.spin()) { api.chime('bells'); api.say('De maan draait een rondje!', 600, 260, 3000, 'l'); } } },
+    { box: [408, 118, 184, 184], label: 'Maanklok', egg: 'klok', act(api) { if (api.spin()) { api.say(K.heard('De maan draait een rondje!', api.chime('famous')), 600, 260, 4500, 'l'); } } },
     H.say([60, 560, 260, 220], 'Tent', 'tent', ['Zzz... hier slaapt iemand al.', 'Snurk. Morgen weer zwemmen.'], [190, 560, 'l'], 3000, api => { const z = api.$('zzz'); if (z) { z.setAttribute('class', ''); void z.getBoundingClientRect(); z.setAttribute('class', 'zzz'); } }),
     { box: [530, 606, 70, 66], label: 'Marshmallow', egg: 'marshmallow', act(api) { mallowI = (mallowI + 1) % mallowSteps.length; const m = api.$('mallow'); if (m) m.setAttribute('fill', mallowSteps[mallowI][0]); api.say(mallowSteps[mallowI][1], 560, 610, 3000, 'l'); } },
     { box: [725, 595, 110, 170], label: 'Gitaar', egg: 'gitaar', act(api) { api.chime('strum'); api.say('Iedereen zingt mee bij het kampvuur!', 780, 600, 3000, 'r'); } },
