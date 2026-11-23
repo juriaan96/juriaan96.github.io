@@ -135,6 +135,24 @@ K.H = {
   }
 };
 
+/* ---------- radiozenders (openbare livestreams) ---------- */
+const STW = 'https://playerservices.streamtheworld.com/api/livestream-redirect/';
+K.stations = [
+  ['NPO Radio 1', 'https://icecast.omroep.nl/radio1-bb-mp3'],
+  ['NPO Radio 2', 'https://icecast.omroep.nl/radio2-bb-mp3'],
+  ['NPO 3FM', 'https://icecast.omroep.nl/3fm-bb-mp3'],
+  ['NPO Klassiek', 'https://icecast.omroep.nl/radio4-bb-mp3'],
+  ['NPO Radio 5', 'https://icecast.omroep.nl/radio5-bb-mp3'],
+  ['Qmusic', 'https://stream.qmusic.nl/qmusic/mp3'],
+  ['Radio 538', STW + 'RADIO538.mp3'],
+  ['Sky Radio', STW + 'SKYRADIO.mp3'],
+  ['Radio 10', STW + 'RADIO10.mp3'],
+  ['Radio Veronica', STW + 'VERONICA.mp3'],
+  ['100% NL', 'https://stream.100p.nl/100pctnl.mp3'],
+  ['SLAM!', 'https://stream.slam.nl/slam_mp3'],
+  ['Sublime', STW + 'SUBLIME.mp3']
+];
+
 /* ---------- pagina bouwen ---------- */
 function buildPage(T, auto, base) {
   const P = K.parts, S = P.ctx('k-');
@@ -159,7 +177,10 @@ function buildPage(T, auto, base) {
   <section class="panel" aria-label="Tijd">
     <div><time class="time" id="dtime">00:00:00</time><div class="date" id="ddate"></div></div>
     <div><p class="count" id="count"></p><p class="sub" id="count2"></p></div>
-    <button class="sound" id="sound" type="button">${T.soundName || 'Haardgeluid'}: uit</button>
+    <div class="ctl">
+      <button class="sound" id="sound" type="button">${T.soundName || 'Haardgeluid'}: uit</button>
+      <div class="radio"><label class="vh" for="station">Radiozender</label><select class="station" id="station">${K.stations.map((st, i) => `<option value="${i}">${st[0]}</option>`).join('')}</select><button class="sound" id="radio" type="button">Radio: uit</button></div>
+    </div>
   </section>
   <section class="xmas" aria-label="Aftellen tot de vakantie">
     <div><h2 id="xmTitle">Aftellen tot de vakantie</h2><p class="sub" id="xmSub"></p><p class="sub" id="xmSchool"></p></div>
@@ -297,6 +318,39 @@ function run(T, auto, base) {
     o.connect(g); g.connect(out); o.start(n); o.stop(n + dur + 0.05);
   }
   function bell(delay, f, vol, out) { [1, 2.76, 5.4].forEach((m, i) => tone(delay, f * m, (vol || 0.22) / (i + 1.5), 2.2 / (i + 1), out)); }
+  /* zware klok met lange nagalm (Big Ben, kerktoren) */
+  function bigBell(delay, f, vol, out, len) {
+    len = len || 4;
+    [[0.5, 0.5], [1, 1], [1.19, 0.35], [1.5, 0.3], [2, 0.45], [2.74, 0.2], [4.1, 0.1]].forEach(p => tone(delay, f * p[0], vol * p[1], len / Math.sqrt(p[0]), out));
+  }
+  /* bekende klokgeluiden; elk uur kiest de klok er willekeurig een */
+  const NOTE = { E3: 164.81, B3: 246.94, E4: 329.63, Fs4: 369.99, Gs4: 415.3, C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880, C6: 1046.5 };
+  const WEST = [['Gs4', 'Fs4', 'E4', 'B3'], ['E4', 'Gs4', 'Fs4', 'B3'], ['E4', 'Fs4', 'Gs4', 'E4'], ['Gs4', 'E4', 'Fs4', 'B3'], ['B3', 'Fs4', 'Gs4', 'E4']];
+  function melody(changes, oct, step, vol, out, start) {
+    let t = start || 0;
+    changes.forEach(ch => { WEST[ch].forEach((nm, i) => (oct > 1 ? bell : bigBell)(t + i * step, NOTE[nm] * oct, vol, out, 3)); t += 4 * step + step * 1.2; });
+    return t;
+  }
+  const CHIMES = [
+    { name: 'Big Ben', play(n, out) { const t = melody([1, 2, 3, 4], 1, 0.75, 0.32, out); for (let i = 0; i < n; i++) bigBell(t + 1.2 + i * 2.6, NOTE.E3, 0.42, out, 6); } },
+    { name: 'de kerkklok', play(n, out) { for (let i = 0; i < n; i++) bigBell(i * 2.2, 196, 0.38, out, 5); } },
+    { name: 'de koekoeksklok', play(n, out) { for (let i = 0; i < n; i++) { tone(i * 1.1, 740, 0.3, 0.35, out); tone(i * 1.1 + 0.38, 587, 0.3, 0.5, out); } } },
+    { name: 'de staande klok', play(n, out) { const t = melody([1, 2], 2, 0.5, 0.2, out); for (let i = 0; i < n; i++) bell(t + 0.8 + i * 1.5, 330, 0.3, out); } },
+    { name: 'de beiaard', play(n, out) {
+      const tune = ['C5', 'E5', 'G5', 'C6', 'A5', 'G5', 'E5', 'D5', 'E5', 'G5', 'C5'];
+      tune.forEach((nm, i) => bell(i * 0.28 + (i === tune.length - 1 ? 0.3 : 0), NOTE[nm], 0.16, out));
+      for (let i = 0; i < n; i++) bell(3.8 + i * 1.6, 262, 0.3, out);
+    } }
+  ];
+  let lastChime = -1;
+  const testChime = /[?&]uurslag/.test(location.search);
+  function famousChime(n, out) {
+    let i = Math.floor(R() * CHIMES.length);
+    if (i === lastChime) i = (i + 1) % CHIMES.length;
+    lastChime = i;
+    CHIMES[i].play(n, out);
+    return CHIMES[i].name;
+  }
   function chime(kind) {
     try {
       initAudio();
@@ -331,6 +385,35 @@ function run(T, auto, base) {
       if (soundOn) { const p = ac.resume(); if (p && p.catch) p.catch(() => {}); master.gain.setTargetAtTime(0.8, ac.currentTime, 0.15); crackleLoop(); }
       else master.gain.setTargetAtTime(0, ac.currentTime, 0.08);
     } catch (e) { soundOn = false; btn.disabled = true; btn.classList.remove('on'); btn.textContent = 'Geluid niet beschikbaar'; }
+  });
+
+  /* radio */
+  const rBtn = $('radio'), rSel = $('station'), radio = new Audio();
+  radio.preload = 'none';
+  let radioOn = false;
+  try { const sv = localStorage.getItem('klok-zender'); if (sv !== null && K.stations[+sv]) rSel.value = sv; } catch (e) { /* geen opslag */ }
+  function rLabel(txt, on) { rBtn.textContent = txt; rBtn.classList.toggle('on', !!on); }
+  function radioPlay() {
+    const st = K.stations[+rSel.value] || K.stations[0];
+    radioOn = true;
+    rLabel('Radio: laden...', true);
+    radio.src = st[1];
+    const p = radio.play();
+    if (p && p.catch) p.catch(() => { if (radioOn) { radioOn = false; rLabel('Radio lukt niet, probeer opnieuw'); } });
+  }
+  function radioStop() {
+    radioOn = false;
+    radio.pause(); radio.removeAttribute('src');
+    try { radio.load(); } catch (e) { /* stream stoppen */ }
+    rLabel('Radio: uit');
+  }
+  radio.addEventListener('playing', () => { if (radioOn) rLabel('Radio: aan', true); });
+  radio.addEventListener('waiting', () => { if (radioOn) rLabel('Radio: laden...', true); });
+  radio.addEventListener('error', () => { if (radioOn) { radioOn = false; rLabel('Zender niet bereikbaar'); } });
+  rBtn.addEventListener('click', e => { if (radioOn) radioStop(); else radioPlay(); if (e.detail > 0) rBtn.blur(); });
+  rSel.addEventListener('change', () => {
+    try { localStorage.setItem('klok-zender', rSel.value); } catch (e) { /* geen opslag */ }
+    if (radioOn) radioPlay();
   });
 
   /* kaarsen */
@@ -396,10 +479,10 @@ function run(T, auto, base) {
       tEl.setAttribute('datetime', `${pad(h)}:${pad(m)}:${pad(s)}`);
       if (soundOn) {
         burst(s % 2 ? 2600 : 3400, 6, T.camp ? 0.15 : 0.5, 0.035, 0);
-        if (s === 0 && m === 0) {
+        if ((s === 0 && m === 0) || (testChime && s === 0)) {
           const n = h % 12 || 12;
-          if (C.cuckoo) { for (let i = 0; i < n; i++) { tone(i * 1.1, 740, 0.3, 0.35, master); tone(i * 1.1 + 0.38, 587, 0.3, 0.5, master); } }
-          else for (let i = 0; i < n; i++) bell(i * 1.6, 440, 0.3, master);
+          const who = famousChime(n, master);
+          say(`${cap(who)} slaat ${n} uur!`, C.cx + 90, C.cy, 5000, 'l');
         } else if (s === 0 && m === 30) bell(0, 440, 0.3, master);
         if (rumble && L !== null) rumble.gain.setTargetAtTime(0.35 * L, ac.currentTime, 0.5);
       }
