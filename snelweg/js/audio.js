@@ -147,6 +147,12 @@ export class AudioEngine {
       case 'start': // terug op de startberm
         this.tone(440, t, 0.15, { type: 'triangle', gain: 0.18, pan });
         break;
+      case 'sensor': // noncha: er komt iets aan in de strook vóór je (hoog, kort)
+        this.tone(1320, t, 0.06, { type: 'sine', gain: 0.22, pan });
+        break;
+      case 'danger': // noncha: er komt iets aan in jóuw strook (laag, dringend)
+        this.tone(440, t, 0.08, { type: 'square', gain: 0.16, pan });
+        break;
       case 'where': {
         // Waar sta ik? Toonhoogte = rij (hoger = verder), links/rechts = kolom.
         const steps = 8 - row; // 0 = startberm … 8 = overkant

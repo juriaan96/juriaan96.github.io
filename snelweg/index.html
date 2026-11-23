@@ -55,6 +55,7 @@
           <span class="label">Levens</span>
           <span id="hud-lives" class="value lives" role="img" aria-label="3 levens">♥♥♥</span>
         </div>
+        <button id="btn-fs" class="icon-btn" type="button" data-action="fullscreen" aria-label="Volledig scherm" hidden>⛶</button>
         <button id="btn-pause" class="icon-btn" type="button" aria-label="Pauze">❚❚</button>
       </header>
 
@@ -90,6 +91,10 @@
           <p class="headphones" aria-hidden="true">🎧</p>
           <p class="lead"><strong>Zet een koptelefoon op.</strong> Het scherm wordt zwart: je steekt blind over, op je gehoor.</p>
           <ul class="tips">
+            <li>
+              <strong>Piepjes zoals een parkeersensor:</strong> hoge piep = er komt iets aan in de strook vóór je, lage piep =
+              in jóuw strook (wegwezen!). Hoe sneller, hoe dichterbij. <strong>Stil = veilig om te stappen.</strong>
+            </li>
             <li><strong>Links of rechts</strong> in je oor: daar rijdt het voertuig.</li>
             <li><strong>Harder en helderder</strong> = dichterbij. <strong>Hoger</strong> = komt naar je toe.</li>
             <li>Vrachtwagen bromt laag, motor ratelt hoog.</li>
@@ -97,7 +102,10 @@
             <li><kbd>Spatie</kbd>: waar sta ik? (hoger = verder, links/rechts = kolom)</li>
             <li>Touchscreen: tik bovenin = vooruit, onderin = terug, in het midden links of rechts = opzij.</li>
           </ul>
-          <p class="note">Je punten tellen ×3, in een eigen highscorelijst. Na een aanrijding zie je 2 seconden wat je raakte.</p>
+          <p class="note">
+            Het verkeer rijdt rustiger dan normaal en je hebt 5 levens. Je punten tellen ×3, in een eigen highscorelijst. Na een
+            aanrijding zie je 2 seconden wat je raakte.
+          </p>
           <nav class="menu">
             <button type="button" class="btn primary" data-action="noncha-start">Start</button>
             <button type="button" class="btn" data-action="noncha-test">Test geluid: auto van links naar rechts</button>
@@ -114,13 +122,15 @@
           </h1>
           <p id="menu-who" class="who"></p>
           <nav class="menu" aria-label="Hoofdmenu">
-            <button type="button" class="btn primary" data-action="play">Spelen</button>
+            <button type="button" class="btn primary" data-action="play" data-autofocus>Spelen</button>
             <button type="button" class="btn" data-action="noncha">Noncha mode</button>
             <button type="button" class="btn" data-action="customize">Poppetje maken</button>
             <button type="button" class="btn" data-action="highscores">Highscores</button>
             <button type="button" class="btn" data-action="settings">Instellingen</button>
           </nav>
           <p class="hint">Pijltjes of WASD om te lopen · tikken of swipen op een touchscreen · P of Esc voor pauze</p>
+          <!-- Achteraan in de volgorde (focus begint op Spelen), visueel rechtsboven in het paneel -->
+          <button type="button" class="icon-btn panel-corner" id="menu-fs" data-action="fullscreen" title="Volledig scherm" aria-label="Volledig scherm" hidden>⛶</button>
         </div>
       </section>
 

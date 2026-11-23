@@ -41,8 +41,8 @@ export class Traffic {
     this.laneByRow = new Map();
   }
 
-  reset(level) {
-    this.params = levelParams(level);
+  reset(level, mode = 'normal') {
+    this.params = levelParams(level, mode);
     this.lanes = LANES.map((cfg) => ({ ...cfg, vehicles: [], next: null }));
     this.laneByRow = new Map(this.lanes.map((lane) => [lane.row, lane]));
     for (const lane of this.lanes) this.planNext(lane);

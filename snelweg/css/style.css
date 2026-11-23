@@ -102,6 +102,22 @@ body {
   cursor: pointer;
 }
 
+.icon-btn + .icon-btn {
+  margin-left: 0.5rem;
+}
+
+/* Volledig-scherm-knop rechtsboven in het menupaneel (kost geen hoogte) */
+.panel {
+  position: relative;
+}
+
+.panel-corner {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  margin: 0;
+}
+
 /* --- Speelveld -------------------------------------------------------------- */
 
 #stage {

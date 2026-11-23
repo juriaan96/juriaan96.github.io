@@ -1,4 +1,4 @@
-import { START_LIVES, COLS, ROWS } from './config.js';
+import { COLS, ROWS } from './config.js';
 import { Game } from './game.js';
 import { Renderer } from './render.js';
 import { Input } from './input.js';
@@ -75,7 +75,9 @@ function announce(text) {
 }
 
 function vibrate(pattern) {
-  if (settings.vibrate && typeof navigator.vibrate === 'function') {
+  // Browsers staan trillen pas toe na een tik of toets op de pagina.
+  const activated = !navigator.userActivation || navigator.userActivation.hasBeenActive;
+  if (settings.vibrate && activated && typeof navigator.vibrate === 'function') {
     try {
       navigator.vibrate(pattern);
     } catch (e) {
@@ -132,6 +134,51 @@ function updateAudio() {
   const playing = game.active && game.state !== 'hit' && !game.paused && current === 'game';
   const p = game.player;
   audio.updateTraffic(game.traffic, playing ? { x: p.col + 0.5, row: p.row } : null, playing ? ENGINE_LEVEL[game.mode] : 0);
+}
+
+/**
+ * Tijd (s) tot een voertuig in deze rij de speler bereikt; 0 als het er nu al staat,
+ * null als er niets aankomt. Ook de kant waar het vandaan komt (pan -1 links … 1 rechts).
+ */
+function approaching(row) {
+  const lane = game.traffic.laneByRow.get(row);
+  if (!lane) return null;
+  const [xMin, xMax] = game.player.hitbox();
+  let best = null;
+  for (const v of lane.vehicles) {
+    const front = lane.dir > 0 ? v.x + v.length : v.x;
+    const gap = lane.dir > 0 ? xMin - front : front - xMax;
+    const passed = lane.dir > 0 ? v.x >= xMax : v.x + v.length <= xMin;
+    if (passed) continue;
+    const ttc = gap <= 0 ? 0 : gap / Math.max(0.1, v.speed);
+    if (!best || ttc < best.ttc) best = { ttc, pan: lane.dir > 0 ? -0.7 : 0.7 };
+  }
+  return best;
+}
+
+/**
+ * Noncha-hulp, als een parkeersensor:
+ * - hoge piep: er komt iets aan in de strook vóór je (sneller = dichterbij);
+ * - lage, dringende piep: er komt iets aan in jóuw strook;
+ * - stilte: veilig om een stap vooruit te zetten.
+ * Het piepje klinkt uit de kant waar het voertuig vandaan komt.
+ */
+const SENSOR_AHEAD = 1.4; // s vooruitkijken in de strook vóór je
+const SENSOR_HERE = 1.0; // s vooruitkijken in je eigen strook
+let nextBeepAt = 0;
+function updateSensor(now) {
+  if (game.mode !== 'noncha' || game.state !== 'playing' || game.paused || current !== 'game') return;
+  if (now < nextBeepAt) return;
+  const p = game.player;
+  const here = approaching(p.row);
+  const ahead = approaching(p.row - 1);
+  if (here && here.ttc < SENSOR_HERE) {
+    audio.play('danger', { pan: here.pan });
+    nextBeepAt = now + 1000 * (0.08 + 0.25 * (here.ttc / SENSOR_HERE));
+  } else if (ahead && ahead.ttc < SENSOR_AHEAD) {
+    audio.play('sensor', { pan: ahead.pan });
+    nextBeepAt = now + 1000 * (0.09 + 0.4 * (ahead.ttc / SENSOR_AHEAD));
+  }
 }
 
 /**
@@ -264,6 +311,14 @@ const actions = {
     audio.playPassBy();
     announce('Je hoort een auto van links naar rechts rijden.');
   },
+  fullscreen: () => {
+    // Dezelfde tik heeft net al automatisch volledig scherm aangevraagd: niet meteen weer sluiten.
+    if (Date.now() - autoFullscreenAt < 1000) return;
+    autoFullscreenTried = true; // zelf gekozen: niet meer automatisch
+    if (isFullscreen()) exitFullscreen();
+    else enterFullscreen();
+    $('btn-fs').blur();
+  },
   'face-use': () => closeFaceEditor(faceEditor.export()),
   'face-cancel': () => closeFaceEditor(null),
   resume: resumeGame,
@@ -324,8 +379,72 @@ window.addEventListener(
       changed = true;
     }
     if (changed) {
-      updateTouchControls();
       trySaveSettings();
+      // Pas ná deze tik de layout aanpassen: anders schuift de knop onder de vinger weg
+      // (smartboard-modus maakt alles groter) en mist de tik.
+      setTimeout(updateTouchControls, 450);
+    }
+  },
+  { capture: true },
+);
+
+// --- Volledig scherm -------------------------------------------------------------------
+// Een webpagina kan de adresbalk niet zelf verbergen; dat kan alleen via de Fullscreen-API,
+// en alleen direct na een tik/klik. In de smartboard-modus gebeurt dat bij de eerste tik
+// (één keer per keer dat de pagina geopend wordt); daarnaast is er een knop.
+
+const fsRoot = document.documentElement;
+const fsSupported = !!(fsRoot.requestFullscreen || fsRoot.webkitRequestFullscreen);
+const isFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+
+function quietly(result) {
+  if (result && typeof result.catch === 'function') result.catch(() => {});
+}
+
+function enterFullscreen() {
+  try {
+    quietly(fsRoot.requestFullscreen ? fsRoot.requestFullscreen() : fsRoot.webkitRequestFullscreen());
+  } catch (e) {
+    // niet toegestaan of niet ondersteund
+  }
+}
+
+function exitFullscreen() {
+  try {
+    if (document.exitFullscreen) quietly(document.exitFullscreen());
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+  } catch (e) {
+    // al uit volledig scherm
+  }
+}
+
+function updateFullscreenButtons() {
+  const on = isFullscreen();
+  for (const btn of [$('btn-fs'), $('menu-fs')]) {
+    btn.hidden = !fsSupported;
+    btn.setAttribute('aria-label', on ? 'Volledig scherm sluiten' : 'Volledig scherm');
+    btn.title = btn.getAttribute('aria-label');
+  }
+}
+
+for (const type of ['fullscreenchange', 'webkitfullscreenchange']) {
+  document.addEventListener(type, () => {
+    updateFullscreenButtons();
+    fitAppHeight();
+  });
+}
+
+let autoFullscreenTried = false;
+let autoFullscreenAt = 0;
+// pointerup (niet pointerdown): bij aanraking telt pas het loslaten als gebruikersactie.
+window.addEventListener(
+  'pointerup',
+  () => {
+    if (autoFullscreenTried || !fsSupported || !(settings.smartboard || forceSmartboard)) return;
+    autoFullscreenTried = true;
+    if (!isFullscreen()) {
+      autoFullscreenAt = Date.now();
+      enterFullscreen();
     }
   },
   { capture: true },
@@ -648,11 +767,12 @@ function syncHud() {
     shown.mult = game.multiplier;
     $('hud-mult').hidden = game.multiplier === 1;
   }
-  if (shown.lives !== game.lives) {
+  if (shown.lives !== game.lives || shown.maxLives !== game.maxLives) {
+    shown.maxLives = game.maxLives;
     if (game.lives < shown.lives) restartAnimation(hud.lives, 'hurt');
     shown.lives = game.lives;
     const lives = Math.max(0, game.lives);
-    hud.lives.textContent = '♥'.repeat(lives) + '♡'.repeat(Math.max(0, START_LIVES - lives));
+    hud.lives.textContent = '♥'.repeat(lives) + '♡'.repeat(Math.max(0, game.maxLives - lives));
     hud.lives.setAttribute('aria-label', `${lives} ${lives === 1 ? 'leven' : 'levens'}`);
   }
   if (shown.message !== game.message) {
@@ -676,11 +796,13 @@ function frame(now) {
   renderer.draw(game, dt);
   updateAudio();
   updateVibration(now);
+  updateSensor(now);
   syncHud();
   requestAnimationFrame(frame);
 }
 
 renderWho();
+updateFullscreenButtons();
 show('menu');
 requestAnimationFrame(frame);
 window.__snelwegStarted = true; // voor de startcontrole in index.html

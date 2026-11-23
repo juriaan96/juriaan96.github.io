@@ -3,6 +3,7 @@ import {
   ROW_FINISH,
   ROW_MEDIAN,
   START_LIVES,
+  NONCHA_LIVES,
   ROW_POINTS,
   FINISH_POINTS_PER_LEVEL,
   TIME_BONUS_WINDOW,
@@ -36,6 +37,7 @@ export class Game {
     this.level = 1;
     this.score = 0;
     this.lives = START_LIVES;
+    this.maxLives = START_LIVES;
     this.state = 'ready';
     this.paused = false;
     this.time = 0;
@@ -71,13 +73,14 @@ export class Game {
     this.mode = mode;
     this.level = 1;
     this.score = 0;
-    this.lives = START_LIVES;
+    this.maxLives = mode === 'noncha' ? NONCHA_LIVES : START_LIVES;
+    this.lives = this.maxLives;
     this.paused = false;
     this.startLevel();
   }
 
   startLevel() {
-    this.traffic.reset(this.level);
+    this.traffic.reset(this.level, this.mode);
     this.player.reset();
     this.furthestRow = ROW_START;
     this.crossTime = 0;

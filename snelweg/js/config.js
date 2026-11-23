@@ -9,6 +9,7 @@ export const ROW_MEDIAN = 4;
 export const ROW_START = 8;
 
 export const START_LIVES = 3;
+export const NONCHA_LIVES = 5;
 
 // Speler
 export const STEP_COOLDOWN = 0.11; // seconden tussen twee stappen
@@ -45,7 +46,18 @@ export const LANES = [
  *   de volgende op een vast punt. minGapTime is de gegarandeerde ondergrens: zo lang is een
  *   vakje in elke rijstrook minstens vrij, ook in de hoogste levels.
  */
-export function levelParams(level) {
+export function levelParams(level, mode = 'normal') {
+  if (mode === 'noncha') {
+    // Blind oversteken: rustiger verkeer, ruimere gaten (minstens 1,4 s, standaard 2 s) en
+    // de moeilijkheid stijgt maar half zo snel per level.
+    const n = Math.max(0, level - 1) * 0.5;
+    return {
+      baseSpeed: Math.min(1.5 + 0.3 * n, 4.0),
+      minGapTime: Math.max(2.0 - 0.06 * n, 1.4),
+      maxGapTime: Math.max(4.2 - 0.2 * n, 2.6),
+      speedLimit: 70 + 10 * level,
+    };
+  }
   const n = Math.max(0, level - 1);
   return {
     baseSpeed: Math.min(2.0 + 0.4 * n, 6.0),
