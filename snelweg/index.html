@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1216" />
+    <title>Snelweg Oversteken</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="css/style.css" />
+    <script type="module" src="js/main.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <header id="hud" class="is-hidden">
+        <div class="hud-item">
+          <span class="label">Level</span>
+          <span id="hud-level" class="value">1</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">Score <span id="hud-mult" class="mult" hidden>×3</span></span>
+          <span id="hud-score" class="value">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">Levens</span>
+          <span id="hud-lives" class="value lives" role="img" aria-label="3 levens">♥♥♥</span>
+        </div>
+        <button id="btn-pause" class="icon-btn" type="button" aria-label="Pauze">❚❚</button>
+      </header>
+
+      <main id="stage">
+        <canvas id="game" aria-label="Speelveld"></canvas>
+        <div id="toast" aria-hidden="true" hidden>
+          <p class="toast-title"></p>
+          <p class="toast-text"></p>
+        </div>
+      </main>
+
+      <!-- Pijlknoppen op het scherm (mobiel) -->
+      <div id="touch-controls" class="touch-controls" hidden>
+        <button type="button" class="tc tc-up" data-dir="0,-1" tabindex="-1" aria-label="Omhoog">▲</button>
+        <button type="button" class="tc tc-left" data-dir="-1,0" tabindex="-1" aria-label="Links">◀</button>
+        <button type="button" class="tc tc-right" data-dir="1,0" tabindex="-1" aria-label="Rechts">▶</button>
+        <button type="button" class="tc tc-down" data-dir="0,1" tabindex="-1" aria-label="Omlaag">▼</button>
+      </div>
+
+      <!-- Meldingen voor schermlezers (onzichtbaar) -->
+      <div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
+
+      <!-- Noncha mode: uitleg -->
+      <section id="screen-noncha" class="screen" aria-labelledby="noncha-title" hidden>
+        <div class="panel">
+          <h2 id="noncha-title">Noncha mode</h2>
+          <p class="headphones" aria-hidden="true">🎧</p>
+          <p class="lead"><strong>Zet een koptelefoon op.</strong> Het scherm wordt zwart: je steekt blind over, op je gehoor.</p>
+          <ul class="tips">
+            <li><strong>Links of rechts</strong> in je oor: daar rijdt het voertuig.</li>
+            <li><strong>Harder en helderder</strong> = dichterbij. <strong>Hoger</strong> = komt naar je toe.</li>
+            <li>Vrachtwagen bromt laag, motor ratelt hoog.</li>
+            <li>Tik = stap, belletje = middenberm, loopje = overkant.</li>
+            <li><kbd>Spatie</kbd>: waar sta ik? (hoger = verder, links/rechts = kolom)</li>
+          </ul>
+          <p class="note">Je punten tellen ×3, in een eigen highscorelijst. Na een aanrijding zie je 2 seconden wat je raakte.</p>
+          <nav class="menu">
+            <button type="button" class="btn primary" data-action="noncha-start">Start</button>
+            <button type="button" class="btn" data-action="noncha-test">Test geluid: auto van links naar rechts</button>
+            <button type="button" class="btn" data-action="menu">Terug</button>
+          </nav>
+        </div>
+      </section>
+
+      <!-- Startmenu -->
+      <section id="screen-menu" class="screen" aria-labelledby="menu-title">
+        <div class="panel">
+          <h1 id="menu-title" class="sign">
+            <span class="sign-inner">Snelweg<br />Oversteken</span>
+          </h1>
+          <p id="menu-who" class="who"></p>
+          <nav class="menu" aria-label="Hoofdmenu">
+            <button type="button" class="btn primary" data-action="play">Spelen</button>
+            <button type="button" class="btn" data-action="noncha">Noncha mode</button>
+            <button type="button" class="btn" data-action="customize">Poppetje maken</button>
+            <button type="button" class="btn" data-action="highscores">Highscores</button>
+            <button type="button" class="btn" data-action="settings">Instellingen</button>
+          </nav>
+          <p class="hint">Pijltjes of WASD om te lopen · swipen op mobiel · P of Esc voor pauze</p>
+        </div>
+      </section>
+
+      <!-- Poppetje maken -->
+      <section id="screen-customize" class="screen" aria-labelledby="cz-title" hidden>
+        <div class="panel wide">
+          <h2 id="cz-title">Poppetje maken</h2>
+          <div class="cz-field cz-profiles-field">
+            <span class="cz-label" id="cz-l-profile">Profiel</span>
+            <div class="cz-profiles">
+              <div class="cz-profile-list" role="radiogroup" aria-labelledby="cz-l-profile" data-group-profiles></div>
+              <button type="button" class="cz-new" data-cz="new" aria-label="Nieuw profiel">+ Nieuw</button>
+            </div>
+          </div>
+          <div class="cz-layout">
+            <div class="cz-preview"></div>
+            <div class="cz-controls">
+              <div class="cz-field">
+                <label class="cz-label" for="cz-name">Naam</label>
+                <div class="row">
+                  <input id="cz-name" class="text-input" type="text" maxlength="14" autocomplete="nickname" spellcheck="false" placeholder="Speler" />
+                  <button type="button" class="btn small danger" data-cz="delete">Verwijderen</button>
+                </div>
+              </div>
+              <div class="cz-field">
+                <span class="cz-label">Gezicht</span>
+                <div class="row wrap">
+                  <button type="button" class="btn small" data-cz="photo">Foto kiezen</button>
+                  <button type="button" class="btn small" data-cz="camera">Camera</button>
+                  <button type="button" class="btn small" data-cz="face-remove" hidden>Gezicht weghalen</button>
+                </div>
+                <p class="privacy">🔒 Je foto blijft op dit apparaat. Er wordt niets verstuurd.</p>
+                <input id="cz-file" type="file" accept="image/*" hidden />
+                <input id="cz-camera" type="file" accept="image/*" capture="user" hidden />
+              </div>
+              <div class="cz-field">
+                <span class="cz-label" id="cz-l-base">Poppetje</span>
+                <div class="cz-bases" role="radiogroup" aria-labelledby="cz-l-base" data-group="base"></div>
+              </div>
+              <div class="cz-field">
+                <span class="cz-label" id="cz-l-shirt">Shirt</span>
+                <div class="swatches" role="radiogroup" aria-labelledby="cz-l-shirt" data-group="shirt"></div>
+              </div>
+              <div class="cz-field">
+                <span class="cz-label" id="cz-l-pants">Broek</span>
+                <div class="swatches" role="radiogroup" aria-labelledby="cz-l-pants" data-group="pants"></div>
+              </div>
+              <div class="cz-field">
+                <span class="cz-label" id="cz-l-hat">Hoofddeksel</span>
+                <div class="segmented" role="radiogroup" aria-labelledby="cz-l-hat" data-group="hat"></div>
+              </div>
+              <div class="cz-field">
+                <span class="cz-label" id="cz-l-hatcolor">Kleur hoofddeksel</span>
+                <div class="swatches" role="radiogroup" aria-labelledby="cz-l-hatcolor" data-group="hatColor"></div>
+              </div>
+            </div>
+          </div>
+          <p id="cz-status" class="status" role="status" aria-live="polite"></p>
+          <nav class="menu cz-actions">
+            <button type="button" class="btn" data-cz="random">Willekeurig</button>
+            <button type="button" class="btn primary" data-action="menu">Klaar</button>
+          </nav>
+          <p class="hint">Wijzigingen worden meteen bewaard · pijltjes omhoog/omlaag: onderdeel · links/rechts: optie</p>
+        </div>
+      </section>
+
+      <!-- Gezicht uitsnijden -->
+      <section id="screen-face" class="screen" aria-labelledby="face-title" hidden>
+        <div class="panel">
+          <h2 id="face-title">Gezicht uitsnijden</h2>
+          <canvas
+            id="face-canvas"
+            class="face-canvas"
+            tabindex="0"
+            role="img"
+            aria-label="Foto. Sleep om te verschuiven, knijp of scroll om te zoomen. Toetsenbord: pijltjes verschuiven, plus en min zoomen, R draait."
+          ></canvas>
+          <div class="face-tools">
+            <label class="face-zoom"><span>Zoom</span><input id="face-zoom" type="range" min="0" max="100" value="0" /></label>
+            <button type="button" class="btn small" data-face="rotate" aria-label="Foto draaien">↻ Draaien</button>
+          </div>
+          <p class="privacy">🔒 Je foto blijft op dit apparaat. Er wordt niets verstuurd.</p>
+          <nav class="menu cz-actions">
+            <button type="button" class="btn" data-action="face-cancel">Annuleren</button>
+            <button type="button" class="btn primary" data-action="face-use">Gebruiken</button>
+          </nav>
+        </div>
+      </section>
+
+      <!-- Pauze -->
+      <section id="screen-pause" class="screen" aria-labelledby="pause-title" hidden>
+        <div class="panel">
+          <h2 id="pause-title">Pauze</h2>
+          <nav class="menu" aria-label="Pauzemenu">
+            <button type="button" class="btn primary" data-action="resume">Verder spelen</button>
+            <button type="button" class="btn" data-action="quit">Stoppen</button>
+          </nav>
+          <p class="hint">P of Esc om verder te spelen</p>
+        </div>
+      </section>
+
+      <!-- Game over -->
+      <section id="screen-gameover" class="screen" aria-labelledby="gameover-title" hidden>
+        <div class="panel">
+          <h2 id="gameover-title">Game over</h2>
+          <p id="go-score" class="big"></p>
+          <form id="go-form" class="name-form" hidden>
+            <label for="go-name">Nieuwe highscore! Je naam:</label>
+            <div class="row">
+              <input id="go-name" name="name" type="text" maxlength="14" autocomplete="nickname" enterkeyhint="done" spellcheck="false" />
+              <button type="submit" class="btn primary">Opslaan</button>
+            </div>
+          </form>
+          <p id="go-status" class="status" role="status" aria-live="polite"></p>
+          <nav class="menu" aria-label="Na het spel">
+            <button type="button" class="btn primary" data-action="play-again">Opnieuw spelen</button>
+            <button type="button" class="btn" data-action="highscores">Highscores</button>
+            <button type="button" class="btn" data-action="menu">Hoofdmenu</button>
+          </nav>
+        </div>
+      </section>
+
+      <!-- Highscores -->
+      <section id="screen-highscores" class="screen" aria-labelledby="hs-title" hidden>
+        <div class="panel">
+          <h2 id="hs-title">Highscores</h2>
+          <div class="tabs" role="tablist" aria-label="Spelmodus">
+            <button type="button" role="tab" id="tab-normal" data-mode="normal" aria-controls="hs-list">Normaal</button>
+            <button type="button" role="tab" id="tab-noncha" data-mode="noncha" aria-controls="hs-list">Noncha</button>
+          </div>
+          <ol id="hs-list" class="hs-list" role="tabpanel"></ol>
+          <p id="hs-empty" class="empty" hidden>Nog geen scores. Tijd om over te steken!</p>
+          <nav class="menu">
+            <button type="button" class="btn" data-action="back">Terug</button>
+          </nav>
+        </div>
+      </section>
+
+      <!-- Instellingen -->
+      <section id="screen-settings" class="screen" aria-labelledby="settings-title" hidden>
+        <div class="panel">
+          <h2 id="settings-title">Instellingen</h2>
+          <form id="settings-form" class="settings">
+            <label class="toggle"><span>Geluid</span><input type="checkbox" name="sound" /></label>
+            <label class="range"><span>Volume</span><input type="range" name="volume" min="0" max="100" step="5" /></label>
+            <label class="toggle"><span>Trillen (mobiel)</span><input type="checkbox" name="vibrate" /></label>
+            <label class="toggle"><span>Pijlknoppen op het scherm</span><input type="checkbox" name="touchButtons" /></label>
+          </form>
+          <p class="note">Trillen werkt in noncha mode op telefoons die het ondersteunen (Android). Swipen werkt altijd, ook zonder pijlknoppen.</p>
+          <p id="settings-status" class="status" role="status" aria-live="polite"></p>
+          <nav class="menu">
+            <button type="button" class="btn" data-action="back">Terug</button>
+          </nav>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>
