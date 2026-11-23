@@ -31,6 +31,7 @@ body {
   color: var(--fg);
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   overscroll-behavior: none;
+  overflow: hidden; /* de pagina zelf scrollt nooit; lange panelen scrollen binnenin */
 }
 
 [hidden] {
@@ -40,7 +41,7 @@ body {
 #app {
   position: relative;
   height: 100vh;
-  height: 100dvh;
+  height: 100dvh; /* main.js zet daarna de exacte zichtbare hoogte (window.innerHeight) */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -895,11 +896,14 @@ kbd {
     bottom: max(14px, env(safe-area-inset-bottom));
     transform: none;
   }
+  /* Ruimte aan beide kanten reserveren, zodat het speelveld altijd in het midden staat */
   #app.show-touch #stage {
     padding-bottom: 0;
     padding-bottom: env(safe-area-inset-bottom);
     padding-right: calc(3 * var(--tc) + 2 * var(--tc-gap) + 28px);
     padding-right: calc(3 * var(--tc) + 2 * var(--tc-gap) + 28px + env(safe-area-inset-right));
+    padding-left: calc(3 * var(--tc) + 2 * var(--tc-gap) + 28px);
+    padding-left: calc(3 * var(--tc) + 2 * var(--tc-gap) + 28px + env(safe-area-inset-left));
   }
 }
 
@@ -974,6 +978,22 @@ html.smartboard .settings input[type='checkbox'] {
   html.smartboard #app.show-touch #stage {
     padding-left: calc(3 * var(--tc) + 2 * var(--tc-gap) + 28px);
     padding-left: calc(3 * var(--tc) + 2 * var(--tc-gap) + 28px + env(safe-area-inset-left));
+  }
+}
+
+/* Smartboard op een laag scherm (bijv. 1024×600): menu iets compacter zodat het past */
+@media (max-height: 700px) {
+  html.smartboard .btn {
+    min-height: 50px;
+  }
+  html.smartboard .sign-inner {
+    font-size: 1.5rem;
+  }
+  html.smartboard .menu {
+    gap: 0.45rem;
+  }
+  html.smartboard .hint {
+    display: none;
   }
 }
 

@@ -603,12 +603,24 @@ function fit() {
   const h = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   renderer.resize(w, h);
 }
+/**
+ * Het spel vult precies het zichtbare deel van het scherm. Oude browsers (o.a. op digiborden)
+ * kennen geen 100dvh en tellen bij 100vh de adres-/navigatiebalk mee, waardoor je zou moeten
+ * scrollen. window.innerHeight is wél de echt zichtbare hoogte.
+ */
+function fitAppHeight() {
+  app.style.height = `${window.innerHeight}px`;
+}
+window.addEventListener('resize', fitAppHeight);
+window.addEventListener('orientationchange', () => setTimeout(fitAppHeight, 200));
+fitAppHeight();
+
 if (window.ResizeObserver) {
   new ResizeObserver(fit).observe(stage);
 } else {
   // Oude browsers (bijv. op digiborden): bij venstergrootte en schermwissels opnieuw meten.
   window.addEventListener('resize', fit);
-  window.addEventListener('orientationchange', () => setTimeout(fit, 200));
+  window.addEventListener('orientationchange', () => setTimeout(fit, 250));
 }
 fit();
 
