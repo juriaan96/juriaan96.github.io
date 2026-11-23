@@ -2,6 +2,7 @@ import { COLS, ROWS } from './config.js';
 import { Game, MAX_LEVEL } from './game.js';
 import { Renderer } from './render.js';
 import { Renderer3D } from './render3d.js';
+import { rowKinds } from './themes.js';
 import { Input } from './input.js';
 import { createAvatar } from './character.js';
 import { Customizer, displayName } from './customizer.js';
@@ -86,8 +87,17 @@ for (const type of ['pointerdown', 'keydown']) {
 
 // --- Geluid, trillen en meldingen bij spelgebeurtenissen ---------------------------
 
-const VEHICLE_NAMES = { car: 'een auto', van: 'een bestelbus', truck: 'een vrachtwagen', motor: 'een motor', sport: 'een sportwagen', fire: 'de brandweer', ambulance: 'een ambulance', police: 'de politie' };
-const ROW_NAMES = ['de overkant', 'rijstrook 6', 'rijstrook 5', 'rijstrook 4', 'de middenberm', 'rijstrook 3', 'rijstrook 2', 'rijstrook 1', 'de startberm'];
+const VEHICLE_NAMES = { car: 'een auto', van: 'een bestelbus', truck: 'een vrachtwagen', motor: 'een motor', sport: 'een sportwagen', fire: 'de brandweer', ambulance: 'een ambulance', police: 'de politie', tractor: 'een trekker', bike: 'een fietser', bakfiets: 'een bakfiets', scooter: 'een snorfiets' };
+/** Naam van een rij voor schermlezers; hangt af van het wegtype (fietspad, berm, rijstrook n). */
+function rowName(row) {
+  const kinds = rowKinds(game.params.theme);
+  const fixed = { finish: 'de overkant', start: 'de startberm', median: 'de middenberm', bike: 'het fietspad', verge: 'de berm' };
+  if (fixed[kinds[row]]) return fixed[kinds[row]];
+  // Rijstroken genummerd vanaf de startkant
+  const roads = [];
+  for (let r = kinds.length - 1; r >= 0; r--) if (kinds[r] === 'road') roads.push(r);
+  return `rijstrook ${roads.indexOf(row) + 1}`;
+}
 
 /** Links/rechts-positie van de speler voor geluid: -0.8 (links) … 0.8 (rechts). */
 const playerPan = (i = 0) => (((game.players[i] || game.player).col - 6) / 6) * 0.8;
@@ -158,7 +168,7 @@ function where() {
   const p = game.player;
   audio.play('where', { row: p.row, pan: playerPan() });
   const side = p.col < 5 ? 'links' : p.col > 7 ? 'rechts' : 'midden';
-  announce(`Je staat op ${ROW_NAMES[p.row]}, ${side} (positie ${p.col + 1} van 13).`);
+  announce(`Je staat op ${rowName(p.row)}, ${side} (positie ${p.col + 1} van 13).`);
 }
 
 // Alleen tijdens het spelen klinkt het verkeer (zacht in de normale modus).

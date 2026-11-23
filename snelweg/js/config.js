@@ -32,6 +32,11 @@ export const VEHICLE_TYPES = {
   motor: { length: 0.8, speed: 1.25, colors: ['#15171b', '#b91c1c', '#f97316', '#e5e7eb'] },
   // Alleen op de Autobahn: laag en snel
   sport: { length: 1.4, speed: 1.6, colors: ['#facc15', '#dc2626', '#f97316', '#e5e7eb', '#111827', '#84cc16'] },
+  // Provinciale weg: langzame trekker, en op het fietspad fietsers, bakfietsen en snorfietsen
+  tractor: { length: 1.6, speed: 0.5, colors: ['#2e7d32', '#c62828', '#1565c0'] },
+  bike: { length: 0.6, speed: 1.0, colors: ['#e63946', '#1d4ed8', '#f1f1f1', '#2a9d8f', '#f77f00', '#7b2cbf', '#26282c'] },
+  bakfiets: { length: 0.95, speed: 0.8, colors: ['#1d4ed8', '#e63946', '#2a9d8f', '#f1f1f1'] },
+  scooter: { length: 0.65, speed: 1.5, colors: ['#111827', '#e5e7eb', '#dc2626', '#0ea5e9'] },
   // Hulpdiensten: komen af en toe met sirene voorbij (zie EMERGENCY in traffic.js)
   fire: { length: 2.6, speed: 1, colors: ['#c8102e'], emergency: true },
   ambulance: { length: 2.0, speed: 1, colors: ['#ffd21f'], emergency: true },

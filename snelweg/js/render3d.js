@@ -19,7 +19,7 @@
 import { COLS, ROWS, ROW_MEDIAN } from './config.js';
 import { drawCharacter } from './character.js';
 import { PLAYER_COLORS, shade } from './render.js';
-import { THEMES } from './themes.js';
+import { THEMES, rowKinds } from './themes.js';
 import { paintUnlimited, paintRoundSign, paintPlaceSign, FLAGS } from './signs.js';
 
 // Camera kijkt zo schuin naar beneden: liggend schuin, staand (telefoon) steiler, zodat het
@@ -34,7 +34,16 @@ const MAX_BOXES = 2700; // 2700 × 24 hoekpunten past in 16-bit indices
 const MAX_QUADS = 256;
 const MAX_PIXELS = 2.2e6; // bovengrens voor de tekenresolutie (4K-borden)
 const RAIL_Z = ROW_MEDIAN + 0.28; // vangrail iets achter het midden, zodat je ervóór staat
-const WINDMILL = [3.8, -2.0]; // plek van de molen (provinciale weg)
+// Plekken van het landschap per land (x, z) achter de overkant
+const WINDMILL = [3.8, -2.0]; // molen (NL provinciale weg)
+const FRITUUR = [3.4, -1.5]; // frituur (België)
+const CHALET = [3.6, -2.2]; // chalet (Zwitserland)
+const TURBINES = [
+  [2.2, -2.4],
+  [6.6, -3.2],
+  [10.4, -2.6],
+]; // windmolens (Duitsland)
+const TURBINE_H = 2.3; // hoogte van de mast
 
 // Poppetje-textuur: 1 eenheid = SPR_W px; x -0.5..0.5, y -SPR_TOP..(SPR_H/SPR_W - SPR_TOP)
 const SPR_W = 128;
@@ -592,54 +601,97 @@ export class Renderer3D {
     };
 
     b.box(XC, -0.2, 0, W, 0.2, 140, grass); // de grond
-    for (const top of [1, ROW_MEDIAN + 1]) {
-      b.box(XC, 0, top + 1.5, W, 0.01, 3, asphalt);
-      if (concrete) {
-        // Betonplaten: dwarsvoegen per rijstrook, verspringend
-        const joint = rgb('#7f817f');
-        for (let lane = 0; lane < 3; lane++) {
-          for (let x = -20 + lane * 0.55; x < COLS + 20; x += 1.65) b.box(x, 0.01, top + lane + 0.5, 0.03, 0.002, 0.98, joint);
+
+    // Per rij: rijbaan, middenberm of fietspad (de rest is gras: overkant, start, berm)
+    const kinds = rowKinds(themeId);
+    const joint = rgb('#7f817f');
+    const bikeHex = t.bike || '#b4473a';
+    for (let row = 0; row < ROWS; row++) {
+      const k = kinds[row];
+      const zc = row + 0.5;
+      if (k === 'road' || k === 'median') {
+        b.box(XC, 0, zc, W, 0.01, 1, asphalt);
+        if (k === 'road' && concrete) {
+          // Betonplaten: dwarsvoegen, per rijstrook verspringend
+          for (let x = -20 + (row % 3) * 0.55; x < COLS + 20; x += 1.65) b.box(x, 0.01, zc, 0.03, 0.002, 0.98, joint);
         }
-      }
-      if (t.patches) {
-        // België: lappen asfalt
-        for (let i = 0; i < 26; i++) {
-          const c = rgb(rnd() < 0.6 ? shade(roadHex, -0.18) : shade(roadHex, 0.08));
-          b.box(-8 + rnd() * (COLS + 16), 0.01, top + 0.4 + rnd() * 2.2, 0.6 + rnd() * 1.6, 0.002, 0.3 + rnd() * 0.5, c);
+        if (k === 'road' && t.patches) {
+          // België: lappen asfalt
+          for (let i = 0; i < 9; i++) {
+            const c = rgb(rnd() < 0.6 ? shade(roadHex, -0.18) : shade(roadHex, 0.08));
+            b.box(-8 + rnd() * (COLS + 16), 0.01, row + 0.3 + rnd() * 0.4, 0.6 + rnd() * 1.6, 0.002, 0.25 + rnd() * 0.3, c);
+          }
         }
-      }
-      edgeLine(top + 0.065);
-      edgeLine(top + 3 - 0.065);
-      for (const z of [top + 1, top + 2]) {
-        for (let x = -20.6; x < COLS + 20; x += 2.2) b.box(x + 0.55, 0.01, z, 1.1, 0.004, 0.06, line);
+      } else if (k === 'bike') {
+        // Fietspad: rood asfalt met witte fietssymbolen
+        b.box(XC, 0, zc, W, 0.012, 1, rgb(bikeHex));
+        const white = rgb('#f3f3ee');
+        for (let x = -10.5; x < COLS + 10; x += 4) {
+          for (const wx of [x - 0.15, x + 0.15]) {
+            b.box(wx, 0.012, zc - 0.09, 0.2, 0.003, 0.03, white);
+            b.box(wx, 0.012, zc + 0.09, 0.2, 0.003, 0.03, white);
+            b.box(wx - 0.09, 0.012, zc, 0.03, 0.003, 0.2, white);
+            b.box(wx + 0.09, 0.012, zc, 0.03, 0.003, 0.2, white);
+          }
+          b.box(x, 0.012, zc - 0.05, 0.3, 0.003, 0.03, white); // frame
+        }
       }
     }
 
+    // Strepen: kantstrepen langs elke rijbaan, onderbroken strepen tussen rijstroken
+    for (let row = 0; row < ROWS; row++) {
+      if (kinds[row] !== 'road') continue;
+      const above = kinds[row - 1];
+      const below = kinds[row + 1];
+      if (above !== 'road') edgeLine(row + 0.065);
+      if (below !== 'road') edgeLine(row + 1 - 0.065);
+      if (below === 'road') for (let x = -20.6; x < COLS + 20; x += 2.2) b.box(x + 0.55, 0.01, row + 1, 1.1, 0.004, 0.06, line);
+    }
+
     // Middenberm
-    b.box(XC, 0, ROW_MEDIAN + 0.5, W, 0.01, 1, asphalt);
     if (t.median === 'green') {
-      // Provinciale weg: groene middenmarkering tussen twee witte lijnen, geen vangrail
+      // Nederland: groene middenmarkering tussen twee witte lijnen
       b.box(XC, 0.01, ROW_MEDIAN + 0.5, W, 0.004, 0.44, rgb('#3f8a4e'));
       b.box(XC, 0.011, ROW_MEDIAN + 0.25, W, 0.004, 0.06, line);
       b.box(XC, 0.011, ROW_MEDIAN + 0.75, W, 0.004, 0.06, line);
+    } else if (t.median === 'double') {
+      // België: dubbele doorgetrokken streep
+      b.box(XC, 0.011, ROW_MEDIAN + 0.43, W, 0.004, 0.06, line);
+      b.box(XC, 0.011, ROW_MEDIAN + 0.57, W, 0.004, 0.06, line);
     } else if (t.median === 'concrete') {
-      // België: betonnen barrier (breed onder, smal boven)
+      // Betonnen barrier (breed onder, smal boven)
       const beton = rgb('#c4c4bd');
       b.box(XC, 0, RAIL_Z + 0.05, W, 0.18, 0.42, beton);
       b.box(XC, 0.18, RAIL_Z + 0.05, W, 0.3, 0.18, beton);
     } else {
       b.box(XC, 0.01, ROW_MEDIAN + 0.5, W, 0.006, 0.64, grass);
-      b.box(XC, 0.01, ROW_MEDIAN + 0.065, W, 0.004, 0.05, line);
-      b.box(XC, 0.01, ROW_MEDIAN + 1 - 0.065, W, 0.004, 0.05, line);
       for (let x = -14.85; x < COLS + 15; x += 0.6) b.box(x, 0, RAIL_Z, 0.07, 0.4, 0.07, post);
       b.box(XC, 0.27, RAIL_Z + 0.03, W, 0.13, 0.05, rgb('#c9ced6'));
       b.box(XC, 0.39, RAIL_Z + 0.03, W, 0.012, 0.055, rgb('#eef1f5'));
     }
 
-    // Grasplukjes op de bermen
-    for (const z0 of [0, ROWS - 1]) {
+    // Grasplukjes en in de berm: hectometerpaaltjes (NL) of straatlantaarns (BE)
+    for (let row = 0; row < ROWS; row++) {
+      const k = kinds[row];
+      if (k !== 'finish' && k !== 'start' && k !== 'verge') continue;
       for (let i = 0; i < 70; i++) {
-        b.box(-1 + rnd() * (COLS + 2), 0, z0 + 0.06 + rnd() * 0.88, 0.05, 0.03, 0.05, rnd() < 0.5 ? grassDark : grassLight);
+        b.box(-1 + rnd() * (COLS + 2), 0, row + 0.06 + rnd() * 0.88, 0.05, 0.03, 0.05, rnd() < 0.5 ? grassDark : grassLight);
+      }
+      if (k !== 'verge') continue;
+      const toward = kinds[row + 1] === 'road' || kinds[row + 1] === 'bike' ? 1 : -1; // kant van de weg
+      const z = row + 0.5 + toward * 0.3;
+      if (t.verge === 'hecto') {
+        for (let x = -8.2; x < COLS + 8; x += 3) {
+          b.box(x, 0, z, 0.09, 0.45, 0.07, rgb('#2f6b3a'));
+          b.box(x, 0.3, z + 0.01, 0.07, 0.1, 0.07, rgb('#ffffff'));
+        }
+      } else if (t.verge === 'lamps' && row < ROW_MEDIAN) {
+        // Alleen aan de overkant: aan de startkant zouden de palen het verkeer verbergen
+        for (let x = -9.3; x < COLS + 9; x += 3.5) {
+          b.box(x, 0, z - toward * 0.25, 0.07, 1.7, 0.07, rgb('#4b5563'));
+          b.box(x, 1.65, z + toward * 0.08, 0.06, 0.06, 0.7, rgb('#4b5563'));
+          b.box(x, 1.57, z + toward * 0.4, 0.2, 0.08, 0.26, rgb('#ffe39a'));
+        }
       }
     }
 
@@ -674,14 +726,8 @@ export class Renderer3D {
     } else {
       for (let i = 0; i < 48; i++) tree(-14 + rnd() * (COLS + 28), -1.1 - rnd() * 8, i);
     }
-    if (t.scenery === 'windmill') {
-      // Nederland: een molen (de wieken draaien, zie drawWindmill)
-      const [wx, wz] = WINDMILL;
-      const body = rgb('#5a4636');
-      for (let k = 0; k < 5; k++) b.box(wx, k * 0.42, wz, 1.1 - k * 0.1, 0.43, 1.1 - k * 0.1, body, Math.PI / 8);
-      b.box(wx, 2.1, wz, 0.7, 0.36, 0.7, rgb('#3a2e24'));
-      b.box(wx, 0.65, wz, 1.7, 0.06, 1.7, rgb('#7a6a55'), Math.PI / 8); // stelling
-    }
+    // Typisch voor het land, achter de overkant
+    this.buildDecor(b, t, rnd, post);
 
     // Vlaggetje van het land naast het plaatsbord
     const flag = FLAGS[t.flag];
@@ -711,6 +757,130 @@ export class Renderer3D {
     b.box(COLS - 2.3, 0, 0.3, 0.08, 1.0, 0.08, post);
     b.box(COLS - 0.7, 0, 0.3, 0.08, 1.0, 0.08, post);
     b.box(COLS - 1.5, 0.9, 0.3, 2.4, 0.76, 0.06, rgb('#d9dde2'));
+  }
+
+  /** Koe (wit met zwarte vlekken), kop naar rechts. */
+  cow(b, x, z, bell = false) {
+    const white = rgb('#f5f5f5');
+    const black = rgb('#1b1b1b');
+    for (const [dx, dz] of [
+      [-0.26, -0.13],
+      [-0.26, 0.13],
+      [0.26, -0.13],
+      [0.26, 0.13],
+    ]) {
+      b.box(x + dx, 0, z + dz, 0.08, 0.34, 0.08, black);
+    }
+    b.box(x, 0.32, z, 0.78, 0.36, 0.4, white);
+    b.box(x - 0.15, 0.33, z, 0.26, 0.36, 0.42, black); // vlek
+    b.box(x + 0.2, 0.45, z, 0.18, 0.24, 0.41, black);
+    b.box(x + 0.48, 0.5, z, 0.24, 0.24, 0.26, white); // kop
+    b.box(x + 0.6, 0.5, z, 0.06, 0.12, 0.2, rgb('#f0a8a8')); // snuit
+    if (bell) b.box(x + 0.42, 0.36, z + 0.0, 0.1, 0.12, 0.1, rgb('#d4a017'));
+  }
+
+  /** Landschap per land achter de overkant (3D). */
+  buildDecor(b, t, rnd, post) {
+    switch (t.decor) {
+      case 'tulips': {
+        // Tulpenveld en een molen (de wieken draaien, zie drawWindmill)
+        const colors = ['#e63946', '#ffd60a', '#ff70a6', '#f77f00', '#ffffff', '#7b2cbf'].map(rgb);
+        const stem = rgb('#3f7d34');
+        for (let r = 0; r < 7; r++) {
+          const z = -0.9 - r * 0.42;
+          b.box(9, 0, z, 7.6, 0.08, 0.3, stem);
+          for (let x = 5.4; x < 12.6; x += 0.34) b.box(x, 0.08, z, 0.2, 0.2, 0.2, colors[r % colors.length]);
+        }
+        const [wx, wz] = WINDMILL;
+        const body = rgb('#5a4636');
+        for (let k = 0; k < 5; k++) b.box(wx, k * 0.42, wz, 1.1 - k * 0.1, 0.43, 1.1 - k * 0.1, body, Math.PI / 8);
+        b.box(wx, 2.1, wz, 0.7, 0.36, 0.7, rgb('#3a2e24'));
+        b.box(wx, 0.65, wz, 1.7, 0.06, 1.7, rgb('#7a6a55'), Math.PI / 8); // stelling
+        break;
+      }
+      case 'frituur': {
+        // Frituur-kraampje met een reuzenpuntzak friet op het dak
+        const [fx, fz] = FRITUUR;
+        b.box(fx, 0, fz, 2.4, 1.2, 1.3, rgb('#fff6d5'));
+        b.box(fx, 1.2, fz, 2.6, 0.16, 1.5, rgb('#d62828')); // dak
+        for (let i = 0; i < 6; i++) {
+          b.box(fx - 1.1 + i * 0.44, 1.0, fz + 0.72, 0.44, 0.22, 0.16, rgb(i % 2 ? '#ffffff' : '#d62828')); // luifel
+        }
+        b.box(fx, 0.45, fz + 0.66, 2.0, 0.08, 0.06, rgb('#8b5a2b')); // toonbank
+        b.box(fx + 0.6, 1.36, fz, 0.5, 0.55, 0.5, rgb('#d62828'), Math.PI / 4); // puntzak
+        for (let i = 0; i < 5; i++) b.box(fx + 0.45 + i * 0.08, 1.8, fz - 0.1 + (i % 2) * 0.15, 0.07, 0.45 + (i % 3) * 0.1, 0.07, rgb('#ffd60a'));
+        break;
+      }
+      case 'polder': {
+        // Sloot en koeien in de wei
+        b.box(COLS / 2, 0.004, -1.05, 120, 0.006, 0.55, rgb('#3b6ea5'));
+        for (const [x, z] of [
+          [2.4, -2.2],
+          [4.4, -2.9],
+          [8.4, -2.3],
+          [10.8, -3.2],
+          [-1.5, -2.6],
+        ]) {
+          this.cow(b, x, z);
+        }
+        break;
+      }
+      case 'lavender': {
+        // Lavendelvelden
+        const purple = ['#7e5bbf', '#9b7fd1'].map(rgb);
+        for (let r = 0; r < 7; r++) {
+          const z = -0.9 - r * 0.45;
+          for (let x = 0.2 + (r % 2) * 0.25; x < 13; x += 0.5) b.box(x, 0, z, 0.36, 0.28, 0.3, purple[r % 2], 0.3);
+        }
+        break;
+      }
+      case 'chalet': {
+        // Chalet met sneeuw op het dak, en koeien met een bel
+        const [cx, cz] = CHALET;
+        const wood = rgb('#7a4a26');
+        b.box(cx, 0, cz, 2.4, 1.2, 1.6, wood);
+        b.box(cx, 0.55, cz + 0.81, 2.6, 0.08, 0.2, rgb('#f5e6c8')); // balkon
+        for (const wx of [-0.7, 0.7]) b.box(cx + wx, 0.62, cz + 0.8, 0.4, 0.34, 0.03, rgb('#f5e6c8')); // ramen
+        b.box(cx, 0, cz + 0.8, 0.4, 0.62, 0.03, rgb('#d62828')); // deur
+        const snow = rgb('#f4f6f8');
+        b.box(cx - 0.62, 1.48, cz, 1.55, 0.14, 1.9, snow, 0, 0.48);
+        b.box(cx + 0.62, 1.48, cz, 1.55, 0.14, 1.9, snow, 0, -0.48);
+        this.cow(b, 7.4, -1.8, true);
+        this.cow(b, 9.6, -2.7, true);
+        break;
+      }
+      case 'noisewall': {
+        // Geluidsscherm langs de snelweg
+        const panel = rgb('#7f8f7a');
+        const frame = rgb('#5c6658');
+        b.box(COLS / 2, 0, -0.66, 60, 1.7, 0.12, panel);
+        b.box(COLS / 2, 1.7, -0.66, 60, 0.08, 0.16, frame);
+        for (let x = -20; x < COLS + 20; x += 2.4) b.box(x, 0, -0.6, 0.1, 1.75, 0.14, frame);
+        break;
+      }
+      case 'turbines': {
+        // Windmolens (wieken draaien, zie drawTurbines)
+        for (const [x, z] of TURBINES) {
+          b.box(x, 0, z, 0.14, TURBINE_H, 0.14, rgb('#eef0f2'));
+          b.box(x, TURBINE_H - 0.06, z + 0.03, 0.2, 0.18, 0.36, rgb('#e5e7eb'));
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  /** Windmolens: drie wieken die rustig draaien. */
+  drawTurbines(b) {
+    const a0 = this.reducedMotion ? 0.3 : this.time * 1.2;
+    const white = rgb('#f5f6f7');
+    for (const [x, z] of TURBINES) {
+      for (let i = 0; i < 3; i++) {
+        const a = a0 + (i * Math.PI * 2) / 3 + x;
+        b.box(x + Math.cos(a) * 0.6, TURBINE_H + 0.03 + Math.sin(a) * 0.6, z + 0.24, 1.2, 0.1, 0.04, white, 0, a);
+      }
+    }
   }
 
   /** Molenwieken (draaien langzaam). */
@@ -904,7 +1074,8 @@ export class Renderer3D {
         this.addVehicle(dyn, v, lane);
       }
     }
-    if (theme.scenery === 'windmill') this.drawWindmill(dyn);
+    if (theme.decor === 'tulips') this.drawWindmill(dyn);
+    if (theme.decor === 'turbines') this.drawTurbines(dyn);
     this.updateParticles(game.paused ? 0 : dt, dyn);
     dyn.upload();
     dyn.draw(lit);
@@ -920,7 +1091,8 @@ export class Renderer3D {
     for (const lane of game.traffic.lanes) {
       for (const v of lane.vehicles) {
         if (v.x + v.length < -9 || v.x > COLS + 9) continue;
-        const w = v.type === 'motor' ? 0.4 : v.type === 'truck' || v.type === 'fire' ? 1.0 : 0.9;
+        const narrow = v.type === 'motor' || v.type === 'bike' || v.type === 'scooter';
+        const w = narrow ? 0.4 : v.type === 'bakfiets' ? 0.55 : v.type === 'truck' || v.type === 'fire' ? 1.0 : 0.9;
         this.quads.add([v.x + v.length / 2 + 0.08, 0.015, lane.row + 0.56], Rg, Ug, v.length + 0.3, w);
       }
     }
@@ -949,6 +1121,20 @@ export class Renderer3D {
       this.canvasTex(`place:${theme.placeSign}:${game.place}`, 256, 78, (ctx, w, h) => paintPlaceSign(ctx, 0, 0, w, h, theme.placeSign, game.place)),
       [1, 1, 1, 1],
     );
+
+    if (theme.decor === 'frituur') {
+      // Bord "FRITUUR" op het kraampje
+      this.quads.add([FRITUUR[0] - 0.2, 0.78, FRITUUR[1] + 0.66], [1, 0, 0], [0, 1, 0], 1.6, 0.36);
+      this.drawQuads(
+        tex,
+        this.canvasTex('frituur', 160, 36, (ctx, w, h) => {
+          ctx.fillStyle = '#ffd60a';
+          ctx.fillRect(0, 0, w, h);
+          this.text(ctx, 'FRITUUR', w / 2, h / 2 + 1, 28, '#d62828', 900);
+        }),
+        [1, 1, 1, 1],
+      );
+    }
 
     // Tik-markering op de grond
     if (this.tap) {
@@ -1113,6 +1299,54 @@ export class Renderer3D {
         part(-L / 2, -L / 2 + 0.14, 0.4, 0.44, 0.66, dark); // spoiler
         wheels([L / 2 - 0.3, -L / 2 + 0.32], 0.6, 0.16);
         lights(L / 2, -L / 2, 0.16, 0.24, 0.22);
+        break;
+      }
+      case 'tractor': {
+        // Trekker: grote achterwielen, motorkap, cabine met ruiten, uitlaat
+        const dark = rgb('#1b1d21');
+        for (const s of [-1, 1]) {
+          part(-L / 2 + 0.05, -L / 2 + 0.65, 0, 0.6, 0.18, tyre, s * 0.36);
+          part(L / 2 - 0.42, L / 2 - 0.1, 0, 0.3, 0.12, tyre, s * 0.27);
+        }
+        part(-L / 2 + 0.55, L / 2, 0.22, 0.55, 0.36, color); // motorkap
+        part(-L / 2, -L / 2 + 0.7, 0.25, 0.6, 0.5, color); // cabine onder
+        part(-L / 2 + 0.04, -L / 2 + 0.66, 0.6, 0.98, 0.46, glass); // ruiten
+        part(-L / 2 - 0.02, -L / 2 + 0.72, 0.98, 1.04, 0.54, dark); // dak
+        part(0.2, 0.26, 0.55, 0.95, 0.06, dark, 0.1); // uitlaat
+        lights(L / 2, -L / 2, 0.3, 0.38, 0.12);
+        break;
+      }
+      case 'bike':
+      case 'bakfiets': {
+        // Fiets met fietser (en bij een bakfiets een bak met kind voorop)
+        const frame = rgb('#2b2d33');
+        const skin = rgb('#f1c27d');
+        const bak = v.type === 'bakfiets';
+        const front = bak ? L / 2 - 0.05 : L / 2 - 0.12;
+        part(front - 0.14, front + 0.12, 0, 0.26, 0.03, tyre); // voorwiel
+        part(-L / 2 + 0.02, -L / 2 + 0.28, 0, 0.26, 0.03, tyre); // achterwiel
+        part(-L / 2 + 0.15, front, 0.22, 0.27, 0.04, frame);
+        if (bak) {
+          part(L / 2 - 0.45, L / 2 - 0.08, 0.2, 0.5, 0.42, rgb('#8b5a2b'));
+          part(L / 2 - 0.32, L / 2 - 0.18, 0.5, 0.64, 0.14, skin); // kind
+        }
+        const rider = bak ? -L / 2 + 0.25 : -0.05;
+        part(rider - 0.04, rider + 0.06, 0.25, 0.5, 0.16, rgb('#1d3557')); // benen
+        part(rider - 0.08, rider + 0.12, 0.5, 0.82, 0.26, color); // jas
+        part(rider - 0.02, rider + 0.12, 0.82, 0.98, 0.15, skin); // hoofd
+        part(rider - 0.04, rider + 0.08, 0.95, 1.01, 0.16, rgb('#4a2c17')); // haar
+        part(rider + 0.12, rider + 0.32, 0.62, 0.68, 0.06, color, 0.1); // armen
+        part(rider + 0.12, rider + 0.32, 0.62, 0.68, 0.06, color, -0.1);
+        break;
+      }
+      case 'scooter': {
+        // Snorfiets met berijder en helm
+        part(0.15, 0.33, 0, 0.18, 0.06, tyre);
+        part(-0.33, -0.15, 0, 0.18, 0.06, tyre);
+        part(-0.3, 0.3, 0.12, 0.3, 0.2, color);
+        part(0.2, 0.26, 0.3, 0.62, 0.05, rgb('#2b2d33')); // stuur
+        part(-0.18, 0.06, 0.3, 0.62, 0.26, rgb('#30343b'));
+        part(-0.1, 0.1, 0.6, 0.8, 0.2, rgb('#e5e7eb')); // helm
         break;
       }
       case 'fire': {

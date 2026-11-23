@@ -1,6 +1,6 @@
 import { COLS, ROWS, ROW_FINISH, ROW_MEDIAN, ROW_START } from './config.js';
 import { drawCharacter } from './character.js';
-import { THEMES } from './themes.js';
+import { THEMES, rowKinds } from './themes.js';
 import { paintUnlimited, paintRoundSign, paintPlaceSign, paintFlag } from './signs.js';
 
 const C = {
@@ -115,96 +115,309 @@ export class Renderer {
     ctx.setTransform(s, 0, 0, s, 0, 0);
     const rnd = seeded(7);
     const t = THEMES[this.themeId] || THEMES.nl130;
+    const kinds = rowKinds(this.themeId);
     const grass = t.grass;
     const grassDark = shade(grass, -0.15);
     const grassLight = shade(grass, 0.12);
-
-    for (const row of [ROW_FINISH, ROW_START]) {
-      ctx.fillStyle = grass;
-      ctx.fillRect(0, row, COLS, 1);
-      for (let i = 0; i < COLS * 10; i++) {
-        ctx.fillStyle = rnd() < 0.5 ? grassDark : grassLight;
-        ctx.fillRect(rnd() * COLS, row + rnd() * 0.95, 0.05, 0.08);
-      }
-    }
-
-    // Asfalt in de kleur van het wegtype, of (Autobahn) lichte betonplaten met dwarsvoegen.
     const concrete = t.road === 'concrete';
     const road = concrete ? C.concrete : t.road;
     const roadDark = concrete ? C.concreteDark : shade(road, -0.12);
     const roadLight = concrete ? C.concreteLight : shade(road, 0.1);
+
+    // 1. Ondergrond per rij: gras (overkant, start, berm), rijbaan, fietspad of middenberm
+    for (let row = 0; row < ROWS; row++) {
+      const kind = kinds[row];
+      if (kind === 'road' || kind === 'median') {
+        ctx.fillStyle = road;
+        ctx.fillRect(0, row, COLS, 1);
+        for (let i = 0; i < COLS * 13; i++) {
+          ctx.fillStyle = rnd() < 0.5 ? roadDark : roadLight;
+          ctx.fillRect(rnd() * COLS, row + rnd(), 0.04, 0.04);
+        }
+        if (kind === 'road' && t.patches) {
+          // België: lappen asfalt
+          for (let i = 0; i < 4; i++) {
+            ctx.fillStyle = rnd() < 0.6 ? shade(road, -0.18) : shade(road, 0.08);
+            ctx.fillRect(rnd() * COLS - 0.5, row + 0.1 + rnd() * 0.4, 0.6 + rnd() * 1.6, 0.3 + rnd() * 0.4);
+          }
+        }
+        if (kind === 'road' && concrete) {
+          ctx.fillStyle = C.joint;
+          for (let x = 0.4 + (row % 3) * 0.55; x < COLS; x += 1.65) ctx.fillRect(x, row, 0.025, 1);
+        }
+      } else if (kind === 'bike') {
+        // Fietspad: rood asfalt met fietssymbolen
+        ctx.fillStyle = t.bike || '#b4473a';
+        ctx.fillRect(0, row, COLS, 1);
+        for (let i = 0; i < COLS * 10; i++) {
+          ctx.fillStyle = rnd() < 0.5 ? shade(t.bike, -0.1) : shade(t.bike, 0.08);
+          ctx.fillRect(rnd() * COLS, row + rnd(), 0.04, 0.04);
+        }
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = 0.035;
+        for (let x = 1.5; x < COLS; x += 4) this.bikeSymbol(ctx, x, row + 0.5);
+      } else {
+        ctx.fillStyle = grass;
+        ctx.fillRect(0, row, COLS, 1);
+        for (let i = 0; i < COLS * 10; i++) {
+          ctx.fillStyle = rnd() < 0.5 ? grassDark : grassLight;
+          ctx.fillRect(rnd() * COLS, row + rnd() * 0.95, 0.05, 0.08);
+        }
+      }
+    }
+
+    // 2. Strepen: kantstrepen langs elke rijbaan, onderbroken strepen tussen rijstroken
     const edgeLine = (y) => {
       if (t.edge === 'dashed') for (let x = 0.1; x < COLS; x += 1.0) ctx.fillRect(x, y, 0.55, 0.05);
       else ctx.fillRect(0, y, COLS, 0.05);
     };
-    for (const top of [ROW_FINISH + 1, ROW_MEDIAN + 1]) {
-      ctx.fillStyle = road;
-      ctx.fillRect(0, top, COLS, 3);
-      for (let i = 0; i < COLS * 40; i++) {
-        ctx.fillStyle = rnd() < 0.5 ? roadDark : roadLight;
-        ctx.fillRect(rnd() * COLS, top + rnd() * 3, 0.04, 0.04);
-      }
-      if (t.patches) {
-        // België: lappen asfalt
-        for (let i = 0; i < 12; i++) {
-          ctx.fillStyle = rnd() < 0.6 ? shade(road, -0.18) : shade(road, 0.08);
-          ctx.fillRect(rnd() * COLS - 0.5, top + 0.15 + rnd() * 2.3, 0.6 + rnd() * 1.6, 0.3 + rnd() * 0.5);
-        }
-      }
-      if (concrete) {
-        ctx.fillStyle = C.joint;
-        for (let lane = 0; lane < 3; lane++) {
-          for (let x = 0.4 + lane * 0.55; x < COLS; x += 1.65) ctx.fillRect(x, top + lane, 0.025, 1);
-        }
-      }
-      // Kantstrepen (doorgetrokken of onderbroken) en onderbroken rijstrookstrepen.
-      ctx.fillStyle = C.line;
-      edgeLine(top + 0.04);
-      edgeLine(top + 3 - 0.09);
-      for (const y of [top + 1, top + 2]) {
-        for (let x = 0.3; x < COLS; x += 2.2) ctx.fillRect(x, y - 0.03, 1.1, 0.06);
-      }
+    ctx.fillStyle = C.line;
+    for (let row = 0; row < ROWS; row++) {
+      if (kinds[row] !== 'road') continue;
+      const above = kinds[row - 1];
+      const below = kinds[row + 1];
+      if (above !== 'road' && above !== 'median') edgeLine(row + 0.04);
+      if (below !== 'road' && below !== 'median') edgeLine(row + 1 - 0.09);
+      if (above === 'median') edgeLine(row + 0.04);
+      if (below === 'median') edgeLine(row + 1 - 0.09);
+      if (below === 'road') for (let x = 0.3; x < COLS; x += 2.2) ctx.fillRect(x, row + 1 - 0.03, 1.1, 0.06);
     }
 
+    // 3. Middenberm
     const m = ROW_MEDIAN;
-    ctx.fillStyle = road;
-    ctx.fillRect(0, m, COLS, 1);
     if (t.median === 'green') {
-      // Provinciale weg: groene middenmarkering tussen twee witte lijnen, geen vangrail
+      // Nederland: groene middenmarkering tussen twee witte lijnen
       ctx.fillStyle = '#3f8a4e';
       ctx.fillRect(0, m + 0.28, COLS, 0.44);
       ctx.fillStyle = C.line;
       ctx.fillRect(0, m + 0.22, COLS, 0.06);
       ctx.fillRect(0, m + 0.72, COLS, 0.06);
-      return;
-    }
-    if (t.median === 'concrete') {
-      // België: betonnen barrier
+    } else if (t.median === 'double') {
+      // België: dubbele doorgetrokken streep
+      ctx.fillStyle = C.line;
+      ctx.fillRect(0, m + 0.4, COLS, 0.06);
+      ctx.fillRect(0, m + 0.54, COLS, 0.06);
+    } else if (t.median === 'concrete') {
+      // Betonnen barrier
       ctx.fillStyle = C.shadow;
       ctx.fillRect(0, m + 0.6, COLS, 0.07);
       ctx.fillStyle = '#b9b9b2';
       ctx.fillRect(0, m + 0.36, COLS, 0.26);
       ctx.fillStyle = '#dcdcd5';
       ctx.fillRect(0, m + 0.44, COLS, 0.1);
-      return;
+    } else {
+      // Gras en een vangrail
+      ctx.fillStyle = grass;
+      ctx.fillRect(0, m + 0.18, COLS, 0.64);
+      for (let i = 0; i < COLS * 4; i++) {
+        ctx.fillStyle = grassDark;
+        ctx.fillRect(rnd() * COLS, m + 0.2 + rnd() * 0.55, 0.05, 0.07);
+      }
+      ctx.fillStyle = C.shadow;
+      ctx.fillRect(0, m + 0.54, COLS, 0.06);
+      for (let x = 0.15; x < COLS; x += 0.6) {
+        ctx.fillStyle = C.post;
+        ctx.fillRect(x, m + 0.42, 0.07, 0.16);
+      }
+      ctx.fillStyle = C.rail;
+      ctx.fillRect(0, m + 0.45, COLS, 0.09);
+      ctx.fillStyle = C.railShine;
+      ctx.fillRect(0, m + 0.46, COLS, 0.025);
     }
-    // Middenberm: smalle asfaltstrook, gras en een vangrail.
-    ctx.fillStyle = grass;
-    ctx.fillRect(0, m + 0.18, COLS, 0.64);
-    for (let i = 0; i < COLS * 4; i++) {
-      ctx.fillStyle = grassDark;
-      ctx.fillRect(rnd() * COLS, m + 0.2 + rnd() * 0.55, 0.05, 0.07);
+
+    // 4. In de berm: hectometerpaaltjes (NL) of straatlantaarns (BE)
+    for (let row = 1; row < ROWS - 1; row++) {
+      if (kinds[row] !== 'verge') continue;
+      // Aan de kant van de weg
+      const y = kinds[row + 1] === 'road' || kinds[row + 1] === 'bike' ? row + 0.8 : row + 0.2;
+      if (t.verge === 'hecto') {
+        for (let x = 0.8; x < COLS; x += 3) {
+          ctx.fillStyle = '#2f6b3a';
+          ctx.fillRect(x, y - 0.08, 0.14, 0.16);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(x + 0.03, y - 0.05, 0.08, 0.05);
+        }
+      } else if (t.verge === 'lamps') {
+        const toward = y > row + 0.5 ? 1 : -1;
+        for (let x = 1.2; x < COLS; x += 3.5) {
+          // Paal met een arm naar de weg en een lamp
+          ctx.fillStyle = '#4b5563';
+          ctx.fillRect(x - 0.05, y - 0.05, 0.1, 0.1);
+          ctx.fillRect(x - 0.015, Math.min(y, y + toward * 0.38), 0.03, 0.38);
+          ctx.fillStyle = 'rgba(255, 214, 120, 0.9)';
+          ctx.beginPath();
+          ctx.arc(x, y + toward * 0.38, 0.07, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
     }
+
+    // 5. Typisch voor het land, op de overkant (links van het plaatsbord)
+    this.drawDecor2d(ctx, t, rnd);
+  }
+
+  /** Klein fietssymbool (fietspad), in vakjes; lijnstijl moet al gezet zijn. */
+  bikeSymbol(ctx, x, y) {
+    ctx.beginPath();
+    ctx.arc(x - 0.14, y + 0.05, 0.09, 0, Math.PI * 2);
+    ctx.moveTo(x + 0.23, y + 0.05);
+    ctx.arc(x + 0.14, y + 0.05, 0.09, 0, Math.PI * 2);
+    ctx.moveTo(x - 0.14, y + 0.05);
+    ctx.lineTo(x - 0.02, y - 0.08);
+    ctx.lineTo(x + 0.1, y - 0.08);
+    ctx.lineTo(x + 0.14, y + 0.05);
+    ctx.moveTo(x - 0.02, y - 0.08);
+    ctx.lineTo(x + 0.02, y + 0.05);
+    ctx.lineTo(x + 0.14, y + 0.05);
+    ctx.stroke();
+  }
+
+  /** Landschap per land op de overkant (rij 0), tussen x = 1.3 en 9.3. */
+  drawDecor2d(ctx, t, rnd) {
+    const y0 = ROW_FINISH;
+    switch (t.decor) {
+      case 'tulips': {
+        // Tulpenveld: rijen rood, geel, roze, oranje
+        const colors = ['#e63946', '#ffd60a', '#ff70a6', '#f77f00', '#ffffff'];
+        for (let i = 0; i < 11; i++) {
+          const x = 1.6 + i * 0.6;
+          ctx.fillStyle = '#4a8a3a';
+          ctx.fillRect(x, y0 + 0.12, 0.42, 0.76);
+          ctx.fillStyle = colors[i % colors.length];
+          for (let k = 0; k < 6; k++) {
+            ctx.beginPath();
+            ctx.arc(x + 0.1 + (k % 2) * 0.22, y0 + 0.2 + k * 0.12, 0.07, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        break;
+      }
+      case 'frituur': {
+        // Frituur-kraampje
+        const x = 2;
+        ctx.fillStyle = C.shadow;
+        ctx.fillRect(x + 0.08, y0 + 0.2, 2.2, 0.72);
+        ctx.fillStyle = '#fff6d5';
+        ctx.fillRect(x, y0 + 0.12, 2.2, 0.72);
+        ctx.fillStyle = '#d62828';
+        for (let i = 0; i < 6; i++) if (i % 2 === 0) ctx.fillRect(x + (i * 2.2) / 6, y0 + 0.12, 2.2 / 6, 0.18);
+        ctx.fillStyle = '#ffd60a';
+        ctx.fillRect(x + 0.05, y0 + 0.62, 2.1, 0.2);
+        // Tekst in pixels (dit is het achtergrondcanvas, niet this.ctx)
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.font = `900 ${Math.max(6, Math.round(0.24 * this.scale))}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#d62828';
+        ctx.fillText('FRITUUR', (x + 1.1) * this.scale, (y0 + 0.47) * this.scale);
+        ctx.restore();
+        // Puntzak friet
+        ctx.fillStyle = '#d62828';
+        ctx.beginPath();
+        ctx.moveTo(x + 2.5, y0 + 0.86);
+        ctx.lineTo(x + 2.3, y0 + 0.38);
+        ctx.lineTo(x + 2.7, y0 + 0.38);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#ffd60a';
+        for (let i = 0; i < 4; i++) ctx.fillRect(x + 2.33 + i * 0.09, y0 + 0.16 + (i % 2) * 0.06, 0.06, 0.24);
+        break;
+      }
+      case 'polder': {
+        // Sloot en koeien
+        ctx.fillStyle = '#3b6ea5';
+        ctx.fillRect(0, y0, COLS, 0.14);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fillRect(0, y0 + 0.03, COLS, 0.02);
+        for (const x of [2.2, 3.6, 5.8]) this.cow2d(ctx, x, y0 + 0.55);
+        break;
+      }
+      case 'lavender': {
+        // Lavendelvelden
+        for (let i = 0; i < 5; i++) {
+          ctx.fillStyle = i % 2 ? '#9b7fd1' : '#7e5bbf';
+          for (let x = 1.4; x < 9.2; x += 0.32) {
+            ctx.beginPath();
+            ctx.arc(x + (i % 2) * 0.16, y0 + 0.16 + i * 0.16, 0.08, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        break;
+      }
+      case 'chalet': {
+        // Chalet met sneeuw op het dak, dennen en een koe
+        const x = 2.2;
+        ctx.fillStyle = '#7a4a26';
+        ctx.fillRect(x, y0 + 0.32, 1.4, 0.58);
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(x - 0.15, y0 + 0.36);
+        ctx.lineTo(x + 0.7, y0 + 0.04);
+        ctx.lineTo(x + 1.55, y0 + 0.36);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#f5e6c8';
+        ctx.fillRect(x + 0.2, y0 + 0.5, 0.25, 0.2);
+        ctx.fillRect(x + 0.95, y0 + 0.5, 0.25, 0.2);
+        ctx.fillStyle = '#d62828';
+        ctx.fillRect(x + 0.55, y0 + 0.58, 0.3, 0.32);
+        for (const fx of [4.4, 5.1, 7.6, 8.3]) this.fir2d(ctx, fx, y0 + 0.9);
+        this.cow2d(ctx, 6.3, y0 + 0.6);
+        break;
+      }
+      case 'noisewall': {
+        // Geluidsscherm langs de snelweg
+        ctx.fillStyle = '#7f8f7a';
+        ctx.fillRect(0, y0, COLS, 0.22);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        for (let x = 0; x < COLS; x += 1.2) ctx.fillRect(x, y0, 0.04, 0.22);
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillRect(0, y0 + 0.02, COLS, 0.03);
+        break;
+      }
+      case 'turbines': {
+        // Windmolens
+        for (const x of [2.4, 4.6, 6.8]) {
+          ctx.fillStyle = '#e5e7eb';
+          ctx.fillRect(x - 0.03, y0 + 0.35, 0.06, 0.58);
+          ctx.save();
+          ctx.translate(x, y0 + 0.35);
+          for (let k = 0; k < 3; k++) {
+            ctx.rotate((Math.PI * 2) / 3);
+            ctx.fillRect(-0.025, -0.3, 0.05, 0.3);
+          }
+          ctx.restore();
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  /** Koe van bovenaf (wit met zwarte vlekken). */
+  cow2d(ctx, x, y) {
     ctx.fillStyle = C.shadow;
-    ctx.fillRect(0, m + 0.54, COLS, 0.06);
-    for (let x = 0.15; x < COLS; x += 0.6) {
-      ctx.fillStyle = C.post;
-      ctx.fillRect(x, m + 0.42, 0.07, 0.16);
-    }
-    ctx.fillStyle = C.rail;
-    ctx.fillRect(0, m + 0.45, COLS, 0.09);
-    ctx.fillStyle = C.railShine;
-    ctx.fillRect(0, m + 0.46, COLS, 0.025);
+    ctx.fillRect(x - 0.24, y - 0.1, 0.56, 0.3);
+    ctx.fillStyle = '#f5f5f5';
+    roundRect(ctx, x - 0.3, y - 0.15, 0.56, 0.3, 0.1);
+    ctx.fill();
+    ctx.fillStyle = '#1b1b1b';
+    ctx.fillRect(x - 0.18, y - 0.15, 0.16, 0.14);
+    ctx.fillRect(x + 0.05, y, 0.12, 0.12);
+    ctx.fillRect(x + 0.26, y - 0.08, 0.12, 0.16); // kop
+  }
+
+  /** Den (driehoek) met de voet op (x, y). */
+  fir2d(ctx, x, y) {
+    ctx.fillStyle = '#1f5130';
+    ctx.beginPath();
+    ctx.moveTo(x - 0.25, y);
+    ctx.lineTo(x, y - 0.75);
+    ctx.lineTo(x + 0.25, y);
+    ctx.closePath();
+    ctx.fill();
   }
 
   // --- Per frame -------------------------------------------------------------
@@ -370,6 +583,16 @@ export class Renderer {
       case 'sport':
         this.drawSport(v, L);
         break;
+      case 'tractor':
+        this.drawTractor(v, L);
+        break;
+      case 'bike':
+      case 'bakfiets':
+        this.drawBike(v, L, v.type === 'bakfiets');
+        break;
+      case 'scooter':
+        this.drawScooter(v, L);
+        break;
       case 'fire':
         this.drawFire(v, L);
         break;
@@ -411,6 +634,62 @@ export class Renderer {
     ctx.fillStyle = C.taillight;
     ctx.fillRect(x0, y0 + 0.08, 0.04, 0.1);
     ctx.fillRect(x0, -y0 - 0.18, 0.04, 0.1);
+  }
+
+  /** Trekker: motorkap voor, cabine achter, grote achterwielen. */
+  drawTractor(v, L) {
+    const ctx = this.ctx;
+    const x0 = -L / 2;
+    fillRound(ctx, x0 + 0.06, -0.3, L, 0.66, 0.1, C.shadow);
+    ctx.fillStyle = '#16181b';
+    ctx.fillRect(x0 + 0.05, -0.38, 0.55, 0.16); // grote achterwielen
+    ctx.fillRect(x0 + 0.05, 0.22, 0.55, 0.16);
+    ctx.fillRect(L / 2 - 0.42, -0.3, 0.3, 0.1); // kleine voorwielen
+    ctx.fillRect(L / 2 - 0.42, 0.2, 0.3, 0.1);
+    fillRound(ctx, x0 + 0.62, -0.17, L - 0.66, 0.34, 0.06, v.color); // motorkap
+    fillRound(ctx, x0, -0.24, 0.66, 0.48, 0.06, v.color); // cabine
+    fillRound(ctx, x0 + 0.08, -0.18, 0.5, 0.36, 0.04, 'rgba(20,20,20,0.55)'); // dak/ruit
+    ctx.fillStyle = '#2b2b2b';
+    ctx.fillRect(x0 + 0.85, -0.1, 0.07, 0.07); // uitlaat
+  }
+
+  /** Fiets (en bakfiets) van bovenaf, met fietser. */
+  drawBike(v, L, bakfiets) {
+    const ctx = this.ctx;
+    const x0 = -L / 2;
+    ctx.fillStyle = C.shadow;
+    ctx.fillRect(x0 + 0.04, -0.06, L, 0.16);
+    if (bakfiets) {
+      // Houten bak voorop, met een kind erin
+      fillRound(ctx, L / 2 - 0.42, -0.2, 0.4, 0.4, 0.05, '#8b5a2b');
+      ctx.fillStyle = '#f1c27d';
+      ctx.beginPath();
+      ctx.arc(L / 2 - 0.2, 0, 0.07, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#2b2d33';
+    ctx.fillRect(x0, -0.025, L - (bakfiets ? 0.4 : 0), 0.05); // frame en wielen
+    ctx.fillRect(x0 + (bakfiets ? 0.32 : L - 0.2), -0.16, 0.04, 0.32); // stuur
+    // Fietser: schouders en hoofd
+    fillRound(ctx, x0 + 0.08, -0.17, 0.24, 0.34, 0.1, v.color);
+    ctx.fillStyle = '#4a2c17';
+    ctx.beginPath();
+    ctx.arc(x0 + 0.22, 0, 0.08, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /** Snorfiets (scooter) met helm. */
+  drawScooter(v, L) {
+    const ctx = this.ctx;
+    fillRound(ctx, -L / 2 + 0.04, -0.08, L, 0.2, 0.08, C.shadow);
+    fillRound(ctx, -L / 2, -0.11, L, 0.22, 0.09, v.color);
+    ctx.fillStyle = '#2b2d33';
+    ctx.fillRect(L / 2 - 0.12, -0.16, 0.04, 0.32);
+    fillRound(ctx, -0.18, -0.15, 0.24, 0.3, 0.1, '#30343b');
+    ctx.fillStyle = '#e5e7eb';
+    ctx.beginPath();
+    ctx.arc(-0.04, 0, 0.09, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   /** Brandweerauto: rood, met ladder op het dak en zwaailichten. */

@@ -1,35 +1,65 @@
-// Wegtypes per "maximumsnelheid": elk level ziet er anders uit, met een andere plaats aan de
-// overkant. Alleen uiterlijk (2D en 3D): de moeilijkheid zelf komt uit levelParams.
+// Wegtypes per "maximumsnelheid": elk level is een ander soort weg in een ander land, met een
+// andere plaats aan de overkant. Hoe langzamer de weg, hoe minder rijstroken; de vrije rijen
+// worden berm of fietspad. De moeilijkheid (snelheid, gaten) komt uit levelParams.
 //
+// lanes:     rijstroken en fietspaden (null = 3 + 3, zie LANES in config.js). kind: 'road' | 'bike'
 // speedSign: 'round' (verkeersbord), 'matrix' (matrixbord boven de snelweg) of 'unlimited'
-// median:    'rail' (vangrail), 'green' (groene middenmarkering, geen vangrail), 'concrete' (betonnen barrier)
+// median:    'rail' (vangrail), 'green' (groene middenmarkering), 'double' (dubbele witte streep),
+//            'concrete' (betonnen barrier)
 // edge:      'solid' of 'dashed' (onderbroken kantstreep)
 // road:      kleur van het asfalt, of 'concrete' (betonplaten met voegen)
+// bike:      kleur van het fietspad
+// verge:     wat er in de berm staat: 'hecto' (hectometerpaaltjes), 'lamps' (straatlantaarns) of niets
+// decor:     typisch voor het land, achter/op de overkant (2D en 3D)
 // placeSign: stijl van het plaatsbord aan de overkant (zie signs.js)
-// scenery:   wat er achter de overkant staat (3D)
+// scenery:   bomen achter de overkant (3D): 'trees', 'poplars', 'firs'
 // flag:      vlaggetje naast het plaatsbord
+
+const MIX = {
+  roadNl: { car: 6, van: 2, truck: 1, motor: 1, tractor: 1 }, // provinciale weg: soms een trekker
+  roadBe: { car: 6, van: 2, truck: 1, motor: 1 },
+  outer: { truck: 4, van: 3, car: 4 },
+  inner: { car: 6, motor: 2, van: 1 },
+  bikeNl: { bike: 6, bakfiets: 1, scooter: 2 },
+  bikeBe: { bike: 7, scooter: 2 },
+};
+const road = (row, dir, speed, mix) => ({ row, dir, speed, mix, kind: 'road' });
+const bike = (row, dir, mix) => ({ row, dir, speed: 0.42, mix, kind: 'bike' });
+
+// 1 + 1 met fietspaden, en 2 + 2 met bermen. (Rij 0 = overkant, 4 = middenberm, 8 = start.)
+const LANES_NL80 = [bike(1, -1, MIX.bikeNl), road(3, -1, 1.0, MIX.roadNl), road(5, 1, 1.0, MIX.roadNl), bike(7, 1, MIX.bikeNl)];
+const LANES_BE90 = [bike(2, -1, MIX.bikeBe), road(3, -1, 1.0, MIX.roadBe), road(5, 1, 1.0, MIX.roadBe), bike(6, 1, MIX.bikeBe)];
+const LANES_2X2 = [road(2, -1, 0.9, MIX.outer), road(3, -1, 1.15, MIX.inner), road(5, 1, 1.15, MIX.inner), road(6, 1, 0.9, MIX.outer)];
 
 export const THEMES = {
   nl80: {
     label: 'Provinciale weg',
+    lanes: LANES_NL80,
     speedSign: 'round',
     median: 'green',
     edge: 'dashed',
     road: '#45484e',
+    bike: '#b4473a',
     grass: '#5a9443',
+    verge: '',
+    decor: 'tulips',
     placeSign: 'nl-kom',
     flag: 'nl',
-    scenery: 'windmill',
+    scenery: 'trees',
     places: ['Ommen', 'Dalfsen', 'Heeze', 'Zuidlaren', 'Bergeijk', 'Woudenberg', 'Hellendoorn', 'Garderen', 'Vriezenveen', 'Giethoorn'],
   },
   be90: {
     label: 'Belgische gewestweg',
+    lanes: LANES_BE90,
     speedSign: 'round',
-    median: 'concrete',
+    median: 'double',
     edge: 'solid',
     road: '#4b4d51',
     patches: true, // lappen asfalt
+    bike: '#8f3b30',
     grass: '#5d9446',
+    verge: 'lamps',
+    decor: 'frituur',
     placeSign: 'be-kom',
     flag: 'be',
     scenery: 'trees',
@@ -37,11 +67,14 @@ export const THEMES = {
   },
   nl100: {
     label: 'Autoweg',
+    lanes: LANES_2X2,
     speedSign: 'round',
     median: 'rail',
     edge: 'solid',
     road: '#45484e',
     grass: '#5a9443',
+    verge: 'hecto',
+    decor: 'polder',
     placeSign: 'nl-autoweg',
     flag: 'nl',
     scenery: 'trees',
@@ -49,11 +82,14 @@ export const THEMES = {
   },
   fr110: {
     label: 'Voie express in Frankrijk',
+    lanes: LANES_2X2,
     speedSign: 'round',
     median: 'rail',
     edge: 'dashed',
     road: '#56585d',
     grass: '#86a04a',
+    verge: '',
+    decor: 'lavender',
     placeSign: 'fr-ville',
     flag: 'fr',
     scenery: 'poplars',
@@ -61,11 +97,14 @@ export const THEMES = {
   },
   ch120: {
     label: 'Zwitserse snelweg',
+    lanes: LANES_2X2,
     speedSign: 'round',
-    median: 'rail',
+    median: 'concrete',
     edge: 'solid',
     road: '#47494e',
     grass: '#4f8c3c',
+    verge: '',
+    decor: 'chalet',
     placeSign: 'ch-green',
     flag: 'ch',
     scenery: 'firs',
@@ -73,11 +112,14 @@ export const THEMES = {
   },
   nl130: {
     label: 'Snelweg',
+    lanes: null,
     speedSign: 'matrix',
     median: 'rail',
     edge: 'solid',
     road: '#45484e',
     grass: '#5a9443',
+    verge: '',
+    decor: 'noisewall',
     placeSign: 'nl-anwb',
     flag: 'nl',
     scenery: 'trees',
@@ -85,11 +127,14 @@ export const THEMES = {
   },
   de: {
     label: 'Autobahn',
+    lanes: null,
     speedSign: 'unlimited',
     median: 'rail',
     edge: 'solid',
     road: 'concrete',
     grass: '#5a9443',
+    verge: '',
+    decor: 'turbines',
     placeSign: 'de-autobahn',
     flag: 'de',
     scenery: 'trees',
@@ -110,6 +155,21 @@ export function themeIdFor(speedLimit) {
   if (speedLimit >= 100) return 'nl100';
   if (speedLimit >= 90) return 'be90';
   return 'nl80';
+}
+
+/**
+ * Soort per rij (0..8): 'finish', 'road', 'bike', 'verge' (berm), 'median', 'start'.
+ * Zonder eigen lanes: 3 + 3 rijstroken.
+ */
+export function rowKinds(themeId) {
+  const t = THEMES[themeId] || THEMES.nl130;
+  const kinds = ['finish', 'verge', 'verge', 'verge', 'median', 'verge', 'verge', 'verge', 'start'];
+  if (!t.lanes) {
+    for (const r of [1, 2, 3, 5, 6, 7]) kinds[r] = 'road';
+  } else {
+    for (const lane of t.lanes) kinds[lane.row] = lane.kind;
+  }
+  return kinds;
 }
 
 /** Een plaats voor aan de overkant: willekeurig, en niet dezelfde als de vorige. */

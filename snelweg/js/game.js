@@ -28,7 +28,7 @@ const DUEL_HIT_PAUSE = 1.0; // samen spelen: zo lang ligt een geraakte speler pl
 const DUEL_WIN_PAUSE = 1.8; // feestje voordat het winnaarsscherm komt
 const DUEL_START_COLS = [3, 9];
 // Zware voertuigen drukken je plat; lichte laten je wegtollen
-const HEAVY = ['truck', 'van', 'fire', 'ambulance'];
+const HEAVY = ['truck', 'van', 'fire', 'ambulance', 'tractor'];
 export const MAX_LEVEL = 30;
 
 /**
@@ -136,11 +136,12 @@ export class Game {
     this.maxLives = mode === 'noncha' ? NONCHA_LIVES : START_LIVES;
     this.lives = this.maxLives;
     this.paused = false;
-    this.startLevel();
+    this.startLevel(true);
   }
 
-  startLevel() {
-    this.traffic.reset(this.level, this.mode === 'duel' ? 'normal' : this.mode);
+  /** @param {boolean} [freshGame] begin van een spel (de eerste hulpdienst komt dan snel) */
+  startLevel(freshGame = false) {
+    this.traffic.reset(this.level, this.mode === 'duel' ? 'normal' : this.mode, freshGame);
     this.place = pickPlace(this.params.theme, this.place);
     for (const p of this.players) p.reset();
     this.moves2 = [];

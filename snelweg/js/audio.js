@@ -14,6 +14,11 @@ const ENGINES = {
   truck: { freq: 36, wave: 'sawtooth', lp: 320, noise: 220, noiseGain: 0.7, gain: 0.85, sub: true },
   motor: { freq: 150, wave: 'sawtooth', lp: 2000, noise: 2400, noiseGain: 0.25, gain: 0.45, tremolo: 24 },
   sport: { freq: 105, wave: 'sawtooth', lp: 1500, noise: 1700, noiseGain: 0.3, gain: 0.6 }, // fel en hoog
+  tractor: { freq: 28, wave: 'square', lp: 260, noise: 200, noiseGain: 0.5, gain: 0.75, sub: true, tremolo: 7 }, // puf-puf
+  scooter: { freq: 190, wave: 'sawtooth', lp: 2600, noise: 3000, noiseGain: 0.25, gain: 0.32, tremolo: 32 }, // snorfiets
+  // Fietsen: zacht zoemen van de banden, en een belletje als ze vlak bij je zijn
+  bike: { freq: 140, wave: 'triangle', lp: 300, noise: 2600, noiseGain: 0.6, gain: 0.16, bell: true },
+  bakfiets: { freq: 120, wave: 'triangle', lp: 300, noise: 2200, noiseGain: 0.7, gain: 0.2, bell: true },
   // Hulpdiensten: motor + tweetoonsirene (lo/hi in Hz, rate = wisselingen per seconde / 2)
   fire: { freq: 42, wave: 'sawtooth', lp: 380, noise: 260, noiseGain: 0.6, gain: 0.8, sub: true, siren: { lo: 440, hi: 587, rate: 0.75 } },
   ambulance: { freq: 64, wave: 'sawtooth', lp: 560, noise: 700, noiseGain: 0.4, gain: 0.55, siren: { lo: 554, hi: 740, rate: 0.9 } },
@@ -187,6 +192,12 @@ export class AudioEngine {
         break;
       case 'gameover':
         [392, 330, 262, 196].forEach((f, i) => this.tone(f, t + i * 0.22, 0.3, { type: 'square', gain: 0.1 }));
+        break;
+      case 'bell': // fietsbel: tring-tring
+        for (const d of [0, 0.16]) {
+          this.tone(2350, t + d, 0.14, { type: 'sine', gain: 0.16, pan });
+          this.tone(3120, t + d, 0.1, { type: 'sine', gain: 0.07, pan });
+        }
         break;
       case 'ui':
         this.tone(880, t, 0.05, { type: 'triangle', gain: 0.08 });
@@ -369,6 +380,11 @@ export class AudioEngine {
     voice.lp.frequency.setTargetAtTime(spec.lp * muffle * doppler, now, SMOOTH);
     voice.bp.frequency.setTargetAtTime(spec.noise * muffle * doppler, now, SMOOTH);
     if (voice.pan) voice.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, dx / 5)), now, SMOOTH);
+    if (spec.bell && !voice.rang && dist < 2.2 && approach > 0) {
+      // Fietser vlak bij je: tring-tring
+      voice.rang = true;
+      this.play('bell', { pan: Math.max(-1, Math.min(1, dx / 4)) });
+    }
     if (voice.siren) {
       // Van ver al hoorbaar, dichtbij hard; hoger als hij nadert (doppler)
       const s = voice.siren;
