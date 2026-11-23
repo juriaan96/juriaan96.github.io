@@ -129,8 +129,8 @@ function onGameEvent(type, data = {}) {
     case 'levelstart':
       announce(
         game.params.autobahn
-          ? `Level ${data.level}. Autobahn: geen snelheidslimiet.`
-          : `Level ${data.level}. Maximaal ${game.params.speedLimit} kilometer per uur.`,
+          ? `Level ${data.level}. Autobahn: geen snelheidslimiet. Aan de overkant: ${game.place}.`
+          : `Level ${data.level}. ${game.theme.label}, maximaal ${game.params.speedLimit} kilometer per uur. Aan de overkant: ${game.place}.`,
       );
       break;
     case 'median':
@@ -273,7 +273,7 @@ function show(name, { focus = true } = {}) {
 
 /** Elementen die met Tab of pijl omhoog/omlaag bereikbaar zijn (bij radiogroepen en tabs alleen de gekozen optie). */
 function focusables(root) {
-  return [...root.querySelectorAll('button, input, [tabindex]')].filter(
+  return [...root.querySelectorAll('button, input, a[href], [tabindex]')].filter(
     (el) => el.tabIndex >= 0 && !el.disabled && !el.closest('[hidden]'),
   );
 }
@@ -1083,6 +1083,10 @@ function frame(now) {
   syncHud();
   requestAnimationFrame(frame);
 }
+
+// "Terug naar de klokken": alleen op de site waar het spel naast de klokken staat (een map hoger).
+// Lokaal of los gehost zou de link nergens heen gaan. Met ?klokken is hij altijd te zien.
+$('menu-home').hidden = !(/\.github\.io$/.test(location.hostname) || new URLSearchParams(location.search).has('klokken'));
 
 renderWho();
 updateFullscreenButtons();

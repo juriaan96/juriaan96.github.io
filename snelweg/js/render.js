@@ -1,5 +1,7 @@
 import { COLS, ROWS, ROW_FINISH, ROW_MEDIAN, ROW_START } from './config.js';
 import { drawCharacter } from './character.js';
+import { THEMES } from './themes.js';
+import { paintUnlimited, paintRoundSign, paintPlaceSign, paintFlag } from './signs.js';
 
 const C = {
   grass: '#5a9443',
@@ -24,52 +26,14 @@ const C = {
   joint: 'rgba(30, 30, 30, 0.28)',
 };
 
-/** Duits bord "einde snelheidsbeperking": witte cirkel met schuine strepen (in een vierkant van 1 × 1). */
-export function paintUnlimited(ctx, cx, cy, r, lineWidth) {
-  ctx.save();
-  ctx.strokeStyle = '#f5f5f5';
-  ctx.lineWidth = lineWidth;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(cx, cy, r - lineWidth, 0, Math.PI * 2);
-  ctx.clip();
-  ctx.lineWidth = lineWidth * 0.75;
-  for (let i = -2; i <= 2; i++) {
-    const o = i * r * 0.3;
-    ctx.beginPath();
-    ctx.moveTo(cx + o + r, cy - r);
-    ctx.lineTo(cx + o - r, cy + r);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-/** Autobahn-symbool (weg onder een viaduct), wit, gecentreerd op (cx, cy) met grootte s. */
-export function paintAutobahnSymbol(ctx, cx, cy, s, color = '#ffffff') {
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(cx - 0.42 * s, cy + 0.48 * s);
-  ctx.lineTo(cx - 0.07 * s, cy - 0.18 * s);
-  ctx.lineTo(cx + 0.07 * s, cy - 0.18 * s);
-  ctx.lineTo(cx + 0.42 * s, cy + 0.48 * s);
-  ctx.closePath();
-  ctx.fill();
-  // Middenberm (uitgespaard) en viaduct
-  ctx.globalCompositeOperation = 'destination-out';
-  ctx.beginPath();
-  ctx.moveTo(cx - 0.04 * s, cy + 0.48 * s);
-  ctx.lineTo(cx, cy - 0.1 * s);
-  ctx.lineTo(cx + 0.04 * s, cy + 0.48 * s);
-  ctx.closePath();
-  ctx.fill();
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.fillRect(cx - 0.5 * s, cy - 0.4 * s, s, 0.13 * s);
-  ctx.fillRect(cx - 0.5 * s, cy - 0.4 * s, 0.1 * s, 0.35 * s);
-  ctx.fillRect(cx + 0.4 * s, cy - 0.4 * s, 0.1 * s, 0.35 * s);
-  ctx.restore();
+/** Kleur lichter (amt > 0) of donkerder (amt < 0) maken. */
+export function shade(hex, amt) {
+  const n = parseInt(hex.slice(1, 7), 16);
+  const f = (c) => Math.round(Math.min(255, Math.max(0, amt > 0 ? c + (255 - c) * amt : c * (1 + amt))));
+  const r = f((n >> 16) & 255);
+  const g = f((n >> 8) & 255);
+  const b = f(n & 255);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
 
 function seeded(seed) {
@@ -129,11 +93,11 @@ export class Renderer {
     this.drawBackground(this.bg.getContext('2d'));
   }
 
-  /** De achtergrond opnieuw tekenen als de weg verandert (Autobahn of niet). */
+  /** De achtergrond opnieuw tekenen als het wegtype verandert (zie themes.js). */
   syncBackground(game) {
-    const autobahn = !!game.params.autobahn;
-    if (autobahn === !!this.autobahn) return;
-    this.autobahn = autobahn;
+    const id = game.params.theme;
+    if (id === this.themeId) return;
+    this.themeId = id;
     this.drawBackground(this.bg.getContext('2d'));
   }
 
@@ -150,50 +114,85 @@ export class Renderer {
     const s = this.scale;
     ctx.setTransform(s, 0, 0, s, 0, 0);
     const rnd = seeded(7);
+    const t = THEMES[this.themeId] || THEMES.nl130;
+    const grass = t.grass;
+    const grassDark = shade(grass, -0.15);
+    const grassLight = shade(grass, 0.12);
 
     for (const row of [ROW_FINISH, ROW_START]) {
-      ctx.fillStyle = C.grass;
+      ctx.fillStyle = grass;
       ctx.fillRect(0, row, COLS, 1);
       for (let i = 0; i < COLS * 10; i++) {
-        ctx.fillStyle = rnd() < 0.5 ? C.grassDark : C.grassLight;
+        ctx.fillStyle = rnd() < 0.5 ? grassDark : grassLight;
         ctx.fillRect(rnd() * COLS, row + rnd() * 0.95, 0.05, 0.08);
       }
     }
 
-    // Gewone snelweg: asfalt. Autobahn: lichte betonplaten met dwarsvoegen.
-    const ab = !!this.autobahn;
-    const road = ab ? C.concrete : C.asphalt;
+    // Asfalt in de kleur van het wegtype, of (Autobahn) lichte betonplaten met dwarsvoegen.
+    const concrete = t.road === 'concrete';
+    const road = concrete ? C.concrete : t.road;
+    const roadDark = concrete ? C.concreteDark : shade(road, -0.12);
+    const roadLight = concrete ? C.concreteLight : shade(road, 0.1);
+    const edgeLine = (y) => {
+      if (t.edge === 'dashed') for (let x = 0.1; x < COLS; x += 1.0) ctx.fillRect(x, y, 0.55, 0.05);
+      else ctx.fillRect(0, y, COLS, 0.05);
+    };
     for (const top of [ROW_FINISH + 1, ROW_MEDIAN + 1]) {
       ctx.fillStyle = road;
       ctx.fillRect(0, top, COLS, 3);
       for (let i = 0; i < COLS * 40; i++) {
-        if (ab) ctx.fillStyle = rnd() < 0.5 ? C.concreteDark : C.concreteLight;
-        else ctx.fillStyle = rnd() < 0.5 ? C.asphaltDark : C.asphaltLight;
+        ctx.fillStyle = rnd() < 0.5 ? roadDark : roadLight;
         ctx.fillRect(rnd() * COLS, top + rnd() * 3, 0.04, 0.04);
       }
-      if (ab) {
+      if (t.patches) {
+        // België: lappen asfalt
+        for (let i = 0; i < 12; i++) {
+          ctx.fillStyle = rnd() < 0.6 ? shade(road, -0.18) : shade(road, 0.08);
+          ctx.fillRect(rnd() * COLS - 0.5, top + 0.15 + rnd() * 2.3, 0.6 + rnd() * 1.6, 0.3 + rnd() * 0.5);
+        }
+      }
+      if (concrete) {
         ctx.fillStyle = C.joint;
         for (let lane = 0; lane < 3; lane++) {
           for (let x = 0.4 + lane * 0.55; x < COLS; x += 1.65) ctx.fillRect(x, top + lane, 0.025, 1);
         }
       }
-      // Doorgetrokken kantstrepen en onderbroken rijstrookstrepen.
+      // Kantstrepen (doorgetrokken of onderbroken) en onderbroken rijstrookstrepen.
       ctx.fillStyle = C.line;
-      ctx.fillRect(0, top + 0.04, COLS, 0.05);
-      ctx.fillRect(0, top + 3 - 0.09, COLS, 0.05);
+      edgeLine(top + 0.04);
+      edgeLine(top + 3 - 0.09);
       for (const y of [top + 1, top + 2]) {
         for (let x = 0.3; x < COLS; x += 2.2) ctx.fillRect(x, y - 0.03, 1.1, 0.06);
       }
     }
 
-    // Middenberm: smalle asfaltstrook, gras en een vangrail.
     const m = ROW_MEDIAN;
     ctx.fillStyle = road;
     ctx.fillRect(0, m, COLS, 1);
-    ctx.fillStyle = C.grass;
+    if (t.median === 'green') {
+      // Provinciale weg: groene middenmarkering tussen twee witte lijnen, geen vangrail
+      ctx.fillStyle = '#3f8a4e';
+      ctx.fillRect(0, m + 0.28, COLS, 0.44);
+      ctx.fillStyle = C.line;
+      ctx.fillRect(0, m + 0.22, COLS, 0.06);
+      ctx.fillRect(0, m + 0.72, COLS, 0.06);
+      return;
+    }
+    if (t.median === 'concrete') {
+      // België: betonnen barrier
+      ctx.fillStyle = C.shadow;
+      ctx.fillRect(0, m + 0.6, COLS, 0.07);
+      ctx.fillStyle = '#b9b9b2';
+      ctx.fillRect(0, m + 0.36, COLS, 0.26);
+      ctx.fillStyle = '#dcdcd5';
+      ctx.fillRect(0, m + 0.44, COLS, 0.1);
+      return;
+    }
+    // Middenberm: smalle asfaltstrook, gras en een vangrail.
+    ctx.fillStyle = grass;
     ctx.fillRect(0, m + 0.18, COLS, 0.64);
     for (let i = 0; i < COLS * 4; i++) {
-      ctx.fillStyle = C.grassDark;
+      ctx.fillStyle = grassDark;
       ctx.fillRect(rnd() * COLS, m + 0.2 + rnd() * 0.55, 0.05, 0.07);
     }
     ctx.fillStyle = C.shadow;
@@ -236,6 +235,7 @@ export class Renderer {
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       }
     }
+    this.shake = [sx, sy];
     ctx.drawImage(this.bg, sx, sy);
     ctx.setTransform(this.scale, 0, 0, this.scale, sx, sy);
 
@@ -312,33 +312,43 @@ export class Renderer {
   drawSigns(game) {
     const ctx = this.ctx;
     // Matrixbord op de middenberm met de "maximumsnelheid" van dit level.
+    const t = game.theme;
+    const s = this.scale;
+    const [ox, oy] = this.shake || [0, 0];
     const mx = 0.15;
     const my = ROW_MEDIAN + 0.08;
-    fillRound(ctx, mx, my, 0.84, 0.84, 0.08, '#111');
-    if (game.params.autobahn) {
-      // Autobahn: geen limiet (Duits bord "einde snelheidsbeperking")
-      paintUnlimited(ctx, mx + 0.42, my + 0.42, 0.29, 0.045);
+    if (t.speedSign === 'round') {
+      // Gewoon verkeersbord
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, ox, oy);
+      paintRoundSign(ctx, (mx + 0.42) * s, (my + 0.42) * s, 0.38 * s, game.params.speedLimit);
+      ctx.restore();
     } else {
-      ctx.strokeStyle = '#e0262b';
-      ctx.lineWidth = 0.07;
-      ctx.beginPath();
-      ctx.arc(mx + 0.42, my + 0.42, 0.31, 0, Math.PI * 2);
-      ctx.stroke();
-      const limit = String(game.params.speedLimit);
-      this.text(limit, mx + 0.42, my + 0.44, limit.length > 2 ? 0.22 : 0.28, '#f5f5f5');
+      fillRound(ctx, mx, my, 0.84, 0.84, 0.08, '#111');
+      if (t.speedSign === 'unlimited') {
+        // Autobahn: geen limiet (Duits bord "einde snelheidsbeperking")
+        paintUnlimited(ctx, mx + 0.42, my + 0.42, 0.29, 0.045);
+      } else {
+        // Matrixbord boven de snelweg
+        ctx.strokeStyle = '#e0262b';
+        ctx.lineWidth = 0.07;
+        ctx.beginPath();
+        ctx.arc(mx + 0.42, my + 0.42, 0.31, 0, Math.PI * 2);
+        ctx.stroke();
+        const limit = String(game.params.speedLimit);
+        this.text(limit, mx + 0.42, my + 0.44, limit.length > 2 ? 0.22 : 0.28, '#f5f5f5');
+      }
     }
 
-    // Blauw bord op de finishberm (op de Autobahn met het Autobahn-symbool).
-    const bx = COLS - 2.6;
-    const by = ROW_FINISH + 0.14;
-    fillRound(ctx, bx, by, 2.4, 0.72, 0.08, '#f5f5f5');
-    fillRound(ctx, bx + 0.05, by + 0.05, 2.3, 0.62, 0.06, '#1f4fa0');
-    if (game.params.autobahn) {
-      paintAutobahnSymbol(ctx, bx + 0.38, by + 0.37, 0.44);
-      this.text('Overkant', bx + 1.38, by + 0.37, 0.3, '#ffffff');
-    } else {
-      this.text('Overkant', bx + 1.2, by + 0.37, 0.34, '#ffffff');
-    }
+    // Plaatsbord aan de overkant (stijl per land/wegtype, elk level een andere plaats).
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, ox, oy);
+    paintPlaceSign(ctx, (COLS - 2.6) * s, (ROW_FINISH + 0.14) * s, 2.4 * s, 0.72 * s, t.placeSign, game.place);
+    // Vlaggetje van het land ernaast
+    ctx.fillStyle = '#5b6068';
+    ctx.fillRect((COLS - 3.32) * s, (ROW_FINISH + 0.1) * s, 0.05 * s, 0.8 * s);
+    paintFlag(ctx, (COLS - 3.27) * s, (ROW_FINISH + 0.12) * s, 0.54 * s, 0.36 * s, t.flag);
+    ctx.restore();
   }
 
   drawVehicle(v, lane) {

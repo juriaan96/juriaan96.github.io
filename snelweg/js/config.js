@@ -1,5 +1,7 @@
 // Vaste spelinstellingen. Alle posities en afmetingen zijn in grid-eenheden (1 = één vakje).
 
+import { themeIdFor } from './themes.js';
+
 export const COLS = 13;
 export const ROWS = 9;
 
@@ -83,7 +85,8 @@ export function levelParams(level, mode = 'normal') {
 }
 
 function withAutobahn(params) {
-  return { ...params, autobahn: params.speedLimit > AUTOBAHN_ABOVE };
+  // theme: soort weg (zie themes.js), alleen voor het uiterlijk
+  return { ...params, autobahn: params.speedLimit > AUTOBAHN_ABOVE, theme: themeIdFor(params.speedLimit) };
 }
 
 // Score

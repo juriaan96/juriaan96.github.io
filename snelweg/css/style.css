@@ -260,6 +260,17 @@ canvas {
   margin-top: 0.75rem;
 }
 
+/* Link die eruitziet als knop (terug naar de klokken) */
+a.btn {
+  text-decoration: none;
+}
+
+.btn.home {
+  margin-top: 0.4rem;
+  background: transparent;
+  color: var(--muted);
+}
+
 .btn {
   display: flex;
   align-items: center;

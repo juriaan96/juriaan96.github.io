@@ -12,6 +12,7 @@ import {
   levelParams,
 } from './config.js';
 import { Traffic } from './traffic.js';
+import { THEMES, pickPlace } from './themes.js';
 import { Player } from './player.js';
 
 const HIT_PAUSE = 1.2;
@@ -70,6 +71,11 @@ export class Game {
     this.message = null;
     this.messageTimer = 0;
     this.traffic.reset(1);
+    this.place = pickPlace(this.params.theme); // plaats aan de overkant (wisselt per level)
+  }
+
+  get theme() {
+    return THEMES[this.params.theme] || THEMES.nl130;
   }
 
   get params() {
@@ -135,6 +141,7 @@ export class Game {
 
   startLevel() {
     this.traffic.reset(this.level, this.mode === 'duel' ? 'normal' : this.mode);
+    this.place = pickPlace(this.params.theme, this.place);
     for (const p of this.players) p.reset();
     this.moves2 = [];
     this.winner = -1;
@@ -157,13 +164,17 @@ export class Game {
       };
     }
     if (!this.params.autobahn) {
-      return { title: `Level ${this.level}`, text: `Maximaal ${this.params.speedLimit} km/u`, toast: true };
+      return {
+        title: `Level ${this.level}`,
+        text: `${this.theme.label} · maximaal ${this.params.speedLimit} km/u · naar ${this.place}`,
+        toast: true,
+      };
     }
     // Eerste level boven de limiet: welkom op de Autobahn
     const first = this.level <= 1 || !levelParams(this.level - 1, this.mode).autobahn;
     return first
-      ? { title: 'Welkom op de Autobahn!', text: `Level ${this.level} · geen snelheidslimiet`, toast: true }
-      : { title: `Level ${this.level}`, text: 'Autobahn · geen snelheidslimiet', toast: true };
+      ? { title: 'Welkom op de Autobahn!', text: `Level ${this.level} · geen snelheidslimiet · naar ${this.place}`, toast: true }
+      : { title: `Level ${this.level}`, text: `Autobahn · geen snelheidslimiet · naar ${this.place}`, toast: true };
   }
 
   // --- Invoer -------------------------------------------------------------
