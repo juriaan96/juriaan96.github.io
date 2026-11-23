@@ -13,6 +13,7 @@ import {
   qualifies,
   addHighscore,
   loadActiveProfile,
+  loadProfiles,
   StorageError,
   NAME_MAX_LENGTH,
 } from './storage.js';
@@ -55,6 +56,8 @@ const screens = {
   customize: $('screen-customize'),
   face: $('screen-face'),
   noncha: $('screen-noncha'),
+  duel: $('screen-duel'),
+  duelover: $('screen-duelover'),
 };
 const srStatus = $('sr-status');
 
@@ -69,7 +72,7 @@ const customizer = new Customizer(screens.customize, {
 const faceEditor = new FaceEditor($('face-canvas'), $('face-zoom'));
 const audio = new AudioEngine();
 audio.setVolume(settings.sound, settings.volume);
-const game = new Game({ onGameOver: showGameOver, onEvent: onGameEvent });
+const game = new Game({ onGameOver: showGameOver, onEvent: onGameEvent, onDuelOver: showDuelOver });
 const renderer = new Renderer(canvas);
 
 // Browsers staan geluid pas toe na een gebruikersactie.
@@ -83,7 +86,7 @@ const VEHICLE_NAMES = { car: 'een auto', van: 'een bestelbus', truck: 'een vrach
 const ROW_NAMES = ['de overkant', 'rijstrook 6', 'rijstrook 5', 'rijstrook 4', 'de middenberm', 'rijstrook 3', 'rijstrook 2', 'rijstrook 1', 'de startberm'];
 
 /** Links/rechts-positie van de speler voor geluid: -0.8 (links) … 0.8 (rechts). */
-const playerPan = () => ((game.player.col - 6) / 6) * 0.8;
+const playerPan = (i = 0) => (((game.players[i] || game.player).col - 6) / 6) * 0.8;
 
 /** Melding voor schermlezers (zichtbaar voor niemand, hoorbaar voor wie er een gebruikt). */
 function announce(text) {
@@ -105,7 +108,12 @@ function vibrate(pattern) {
 }
 
 function onGameEvent(type, data = {}) {
-  audio.play(type, { pan: playerPan() });
+  const who = data.player || 0;
+  audio.play(type === 'duelwin' ? 'finish' : type, { pan: playerPan(who) });
+  if (game.mode === 'duel') {
+    onDuelEvent(type, who, data);
+    return;
+  }
   switch (type) {
     case 'finish':
       renderer.confetti(game.player.col + 0.5, game.player.row + 0.4);
@@ -150,8 +158,12 @@ function where() {
 const ENGINE_LEVEL = { normal: 0.35, noncha: 1 };
 function updateAudio() {
   const playing = game.active && game.state !== 'hit' && !game.paused && current === 'game';
-  const p = game.player;
-  audio.updateTraffic(game.traffic, playing ? { x: p.col + 0.5, row: p.row } : null, playing ? ENGINE_LEVEL[game.mode] : 0);
+  // Samen spelen: luisteren vanuit het midden tussen beide spelers
+  const ps = game.players;
+  const x = ps.reduce((s, p) => s + p.col + 0.5, 0) / ps.length;
+  const row = ps.reduce((s, p) => s + p.row, 0) / ps.length;
+  const level = ENGINE_LEVEL[game.mode] || ENGINE_LEVEL.normal;
+  audio.updateTraffic(game.traffic, playing ? { x, row: Math.round(row) } : null, playing ? level : 0);
 }
 
 /**
@@ -239,6 +251,7 @@ function show(name, { focus = true } = {}) {
   current = name;
   for (const [key, el] of Object.entries(screens)) el.hidden = key !== name;
   hud.root.classList.toggle('is-hidden', name !== 'game' && name !== 'pause');
+  app.classList.toggle('duel', game.mode === 'duel' && (name === 'game' || name === 'pause'));
   updateTouchControls();
   if (focus && screens[name]) focusFirst(screens[name]);
   if (name === 'game' && document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -347,7 +360,10 @@ const actions = {
   'face-use': () => closeFaceEditor(faceEditor.export()),
   'face-cancel': () => closeFaceEditor(null),
   resume: resumeGame,
-  quit: () => game.quit(),
+  quit: () => (game.mode === 'duel' ? goMenu() : game.quit()),
+  duel: openDuel,
+  'duel-start': () => startDuel(true),
+  'duel-again': () => startDuel(false),
   menu: goMenu,
   back: () => (backTarget === 'gameover' ? show('gameover') : goMenu()),
 };
@@ -382,7 +398,7 @@ function updateTouchControls() {
   app.classList.toggle('show-touch', settings.touchButtons);
   const visible = settings.touchButtons && current === 'game';
   touchControls.hidden = !visible;
-  touchControlsLeft.hidden = !(visible && smartboard);
+  touchControlsLeft.hidden = !(visible && (smartboard || game.mode === 'duel'));
   if (!window.ResizeObserver) fit(); // zonder ResizeObserver zelf opnieuw meten
 }
 
@@ -482,6 +498,8 @@ window.addEventListener(
  */
 function onTap(clientX, clientY, pointerType) {
   if (!settings.tapToWalk || !game.active || game.state !== 'playing') return;
+  // Samen spelen: linkerhelft van het scherm = speler 1, rechterhelft = speler 2
+  const who = game.mode === 'duel' ? sideOf(clientX) : 0;
   // Muisklikken alleen in de smartboard-modus (sommige digiborden geven aanraking door als muis).
   if (pointerType === 'mouse' && !(settings.smartboard || forceSmartboard)) return;
   const r = canvas.getBoundingClientRect();
@@ -494,24 +512,32 @@ function onTap(clientX, clientY, pointerType) {
     else if (gy > (ROWS * 2) / 3) [dx, dy] = [0, 1];
     else [dx, dy] = [gx < COLS / 2 ? -1 : 1, 0];
   } else {
-    const px = game.player.col + 0.5;
-    const py = game.player.row + 0.5;
+    const me = game.players[who] || game.player;
+    const px = me.col + 0.5;
+    const py = me.row + 0.5;
     const ox = gx - px;
     const oy = gy - py;
     if (Math.abs(ox) < 0.5 && Math.abs(oy) < 0.5) return; // op het poppetje zelf getikt
     [dx, dy] = Math.abs(ox) > Math.abs(oy) ? [Math.sign(ox), 0] : [0, Math.sign(oy)];
     renderer.markTap(gx, gy);
   }
-  game.handleMove(dx, dy);
+  game.handleMove(dx, dy, who);
+}
+
+/** Samen spelen: 0 = linkerhelft van het scherm (speler 1), 1 = rechterhelft (speler 2). */
+function sideOf(clientX) {
+  return clientX < window.innerWidth / 2 ? 0 : 1;
 }
 
 for (const btn of document.querySelectorAll('.touch-controls [data-dir]')) {
   const [dx, dy] = btn.dataset.dir.split(',').map(Number);
+  // Samen spelen: linker pijlknoppen = speler 1, rechter = speler 2
+  const side = btn.closest('.tc-side-left') ? 0 : 1;
   btn.addEventListener('pointerdown', (e) => {
     e.preventDefault(); // geen focus, geen zoom, direct reageren
     btn.classList.add('is-pressed');
     audio.unlock();
-    game.handleMove(dx, dy);
+    game.handleMove(dx, dy, game.mode === 'duel' ? side : 0);
   });
   for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
     btn.addEventListener(type, () => btn.classList.remove('is-pressed'));
@@ -524,7 +550,12 @@ for (const btn of document.querySelectorAll('.touch-controls [data-dir]')) {
 const input = new Input(
   stage,
   {
-    onMove: (dx, dy) => game.handleMove(dx, dy),
+    onMove: (dx, dy, source) => {
+      if (game.mode !== 'duel') return game.handleMove(dx, dy);
+      // W A S D = speler 1, pijltjes = speler 2, swipe = de helft waar hij begon
+      const who = source === 'wasd' ? 0 : source === 'arrows' ? 1 : sideOf(source.x);
+      return game.handleMove(dx, dy, who);
+    },
     onPause: pauseGame,
     onWhere: where,
     onTap,
@@ -551,7 +582,7 @@ function handleMenuKey(e) {
     e.preventDefault();
     if (current === 'pause') resumeGame();
     else if (current === 'highscores' || current === 'settings') actions.back();
-    else if (current === 'customize' || current === 'noncha') goMenu();
+    else if (current === 'customize' || current === 'noncha' || current === 'duel' || current === 'duelover') goMenu();
     else if (current === 'face') actions['face-cancel']();
     else if (current === 'gameover' && active !== goName) goMenu(); // niet per ongeluk tijdens naam typen
     return;
@@ -578,6 +609,124 @@ function handleMenuKey(e) {
     const next = i === -1 ? list[0] : list[(i + step + list.length) % list.length];
     next.focus();
   }
+}
+
+// --- Samen spelen ----------------------------------------------------------------------
+// Twee spelers op één apparaat; wie het eerst aan de overkant is, wint.
+
+const GUEST = { id: 'guest', name: 'Gast', look: { base: 'mei', shirt: '#f77f00', pants: '#1f2124', hat: 'cap', hatColor: '#1d4ed8' } };
+const duelChoice = { ids: [null, null], level: 1 };
+let duelPlayers = [GUEST, GUEST]; // profielen van speler 1 en 2 tijdens het spel
+
+function duelOptions(i) {
+  const list = loadProfiles().list;
+  return i === 1 ? list.concat([GUEST]) : list;
+}
+
+function openDuel() {
+  const list = loadProfiles().list;
+  const options1 = duelOptions(0);
+  const options2 = duelOptions(1);
+  if (!options1.some((p) => p.id === duelChoice.ids[0])) duelChoice.ids[0] = profile.id;
+  if (!options2.some((p) => p.id === duelChoice.ids[1])) {
+    const other = list.find((p) => p.id !== duelChoice.ids[0]);
+    duelChoice.ids[1] = other ? other.id : GUEST.id;
+  }
+  renderDuel();
+  show('duel');
+}
+
+function renderDuel() {
+  for (const i of [0, 1]) {
+    const group = screens.duel.querySelector(`[data-duel="${i}"]`);
+    group.textContent = '';
+    for (const p of duelOptions(i)) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cz-profile';
+      btn.setAttribute('role', 'radio');
+      const checked = p.id === duelChoice.ids[i];
+      btn.setAttribute('aria-checked', String(checked));
+      btn.tabIndex = checked ? 0 : -1;
+      btn.dataset.id = p.id;
+      const name = document.createElement('span');
+      name.textContent = p.id === GUEST.id ? GUEST.name : displayName(p);
+      btn.append(createAvatar(p.look, 40, p.faceSmall || p.face), name);
+      group.append(btn);
+    }
+  }
+  for (const btn of screens.duel.querySelectorAll('[data-level]')) {
+    const checked = Number(btn.dataset.level) === duelChoice.level;
+    btn.setAttribute('aria-checked', String(checked));
+    btn.tabIndex = checked ? 0 : -1;
+  }
+}
+
+screens.duel.addEventListener('click', (e) => {
+  const pick = e.target.closest('[data-id]');
+  const level = e.target.closest('[data-level]');
+  let refocus;
+  if (pick) {
+    const i = Number(pick.closest('[data-duel]').dataset.duel);
+    duelChoice.ids[i] = pick.dataset.id;
+    refocus = `[data-duel="${i}"] [data-id="${pick.dataset.id}"]`;
+  } else if (level) {
+    duelChoice.level = Number(level.dataset.level);
+    refocus = `[data-level="${level.dataset.level}"]`;
+  } else {
+    return;
+  }
+  renderDuel();
+  // Focus terug op de zojuist gekozen optie (de profielknoppen zijn opnieuw opgebouwd)
+  const again = screens.duel.querySelector(refocus);
+  if (again) again.focus();
+});
+
+const duelName = (i) => {
+  const p = duelPlayers[i];
+  return p.id === GUEST.id ? GUEST.name : displayName(p);
+};
+
+function startDuel(resetWins) {
+  const all = duelOptions(1);
+  duelPlayers = duelChoice.ids.map((id) => all.find((p) => p.id === id) || GUEST);
+  game.players = [game.player, game.player2];
+  [game.player, game.player2].forEach((pl, i) => {
+    pl.look = { ...duelPlayers[i].look };
+    pl.face = duelPlayers[i].face || null;
+  });
+  game.newGame('duel', { level: duelChoice.level, resetWins });
+  game.glimpseEvery = 0;
+  shown.duel = null; // HUD opnieuw opbouwen
+  show('game');
+}
+
+function onDuelEvent(type, who, data) {
+  switch (type) {
+    case 'levelstart':
+      announce(`Samen spelen. ${duelName(0)} tegen ${duelName(1)}. Lopen!`);
+      break;
+    case 'hit':
+      announce(`${duelName(who)} is geraakt door ${(data.vehicle && VEHICLE_NAMES[data.vehicle.type]) || 'een voertuig'}! Terug naar de start.`);
+      vibrate(120);
+      break;
+    case 'duelwin': {
+      const p = game.players[who];
+      renderer.confetti(p.col + 0.5, p.row + 0.4);
+      game.setMessage({ title: `${duelName(who)} wint!`, text: 'Als eerste aan de overkant', toast: true }, 1.8);
+      announce(`${duelName(who)} wint!`);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+function showDuelOver({ winner, wins }) {
+  $('duelover-title').textContent = `${duelName(winner)} wint!`;
+  $('duel-score').textContent = `Stand: ${duelName(0)} ${wins[0]} – ${wins[1]} ${duelName(1)}`;
+  show('duelover');
+  announce(`${$('duelover-title').textContent} ${$('duel-score').textContent}`);
 }
 
 // --- Game over en highscores -----------------------------------------------------
@@ -782,8 +931,26 @@ function restartAnimation(el, cls) {
 }
 
 const shown = {};
+
+function syncDuelHud() {
+  const key = `${game.wins[0]}-${game.wins[1]}`;
+  if (shown.duel === key) return;
+  shown.duel = key;
+  const el = $('hud-duel-score');
+  el.textContent = '';
+  const a = document.createElement('span');
+  a.className = 'p1';
+  a.textContent = `${duelName(0)} ${game.wins[0]}`;
+  const b = document.createElement('span');
+  b.className = 'p2';
+  b.textContent = `${game.wins[1]} ${duelName(1)}`;
+  el.append(a, ' – ', b);
+}
+
 function syncHud() {
   if (shown.level !== game.level) hud.level.textContent = shown.level = game.level;
+  if (game.mode === 'duel') syncDuelHud();
+  $('hud-duel').hidden = game.mode !== 'duel';
   if (shown.score !== game.score) {
     if (game.score > shown.score) restartAnimation(hud.score, 'bump');
     hud.score.textContent = shown.score = game.score;

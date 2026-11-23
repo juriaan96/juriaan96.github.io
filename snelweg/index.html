@@ -43,15 +43,19 @@
   <body>
     <div id="app">
       <header id="hud" class="is-hidden">
-        <div class="hud-item">
+        <div class="hud-item hud-duel" id="hud-duel" hidden>
+          <span class="label">Samen spelen · stand</span>
+          <span class="value" id="hud-duel-score"></span>
+        </div>
+        <div class="hud-item hud-solo">
           <span class="label">Level</span>
           <span id="hud-level" class="value">1</span>
         </div>
-        <div class="hud-item">
+        <div class="hud-item hud-solo">
           <span class="label">Score <span id="hud-mult" class="mult" hidden>×3</span></span>
           <span id="hud-score" class="value">0</span>
         </div>
-        <div class="hud-item">
+        <div class="hud-item hud-solo">
           <span class="label">Levens</span>
           <span id="hud-lives" class="value lives" role="img" aria-label="3 levens">♥♥♥</span>
         </div>
@@ -134,6 +138,7 @@
           <nav class="menu" aria-label="Hoofdmenu">
             <button type="button" class="btn primary" data-action="play" data-autofocus>Spelen</button>
             <button type="button" class="btn" data-action="noncha">Noncha mode</button>
+            <button type="button" class="btn" data-action="duel">Samen spelen</button>
             <button type="button" class="btn" data-action="customize">Poppetje maken</button>
             <button type="button" class="btn" data-action="highscores">Highscores</button>
             <button type="button" class="btn" data-action="settings">Instellingen</button>
@@ -230,8 +235,52 @@
         </div>
       </section>
 
-      <!-- Pauze -->
-      <section id="screen-pause" class="screen" aria-labelledby="pause-title" hidden>
+      <!-- Samen spelen: kiezen -->
+      <section id="screen-duel" class="screen" aria-labelledby="duel-title" hidden>
+        <div class="panel wide">
+          <h2 id="duel-title">Samen spelen</h2>
+          <p class="lead">Twee poppetjes tegelijk. <strong>Wie het eerst aan de overkant is, wint!</strong> Geraakt? Dan ga je terug naar de start.</p>
+          <div class="duel-players">
+            <div class="duel-player">
+              <span class="cz-label duel-label p1" id="duel-l-1"><span class="dot">1</span> Speler 1 · W A S D</span>
+              <div class="cz-profile-list" role="radiogroup" aria-labelledby="duel-l-1" data-duel="0"></div>
+            </div>
+            <div class="duel-player">
+              <span class="cz-label duel-label p2" id="duel-l-2"><span class="dot">2</span> Speler 2 · pijltjes</span>
+              <div class="cz-profile-list" role="radiogroup" aria-labelledby="duel-l-2" data-duel="1"></div>
+            </div>
+          </div>
+          <div class="glimpse-field">
+            <span class="cz-label" id="duel-l-traffic">Verkeer</span>
+            <div class="segmented" role="radiogroup" aria-labelledby="duel-l-traffic" id="duel-traffic">
+              <button type="button" class="cz-seg" role="radio" aria-checked="false" tabindex="-1" data-level="1">Rustig</button>
+              <button type="button" class="cz-seg" role="radio" aria-checked="false" tabindex="-1" data-level="4">Druk</button>
+              <button type="button" class="cz-seg" role="radio" aria-checked="false" tabindex="-1" data-level="8">Spits</button>
+            </div>
+          </div>
+          <p class="privacy">Touchscreen: speler 1 gebruikt de linkerkant (pijlknoppen of tikken), speler 2 de rechterkant.</p>
+          <nav class="menu">
+            <button type="button" class="btn primary" data-action="duel-start" data-autofocus>Start</button>
+            <button type="button" class="btn" data-action="menu">Terug</button>
+          </nav>
+        </div>
+      </section>
+
+      <!-- Samen spelen: winnaar -->
+      <section id="screen-duelover" class="screen" aria-labelledby="duelover-title" hidden>
+        <div class="panel">
+          <p class="trophy" aria-hidden="true">🏆</p>
+          <h2 id="duelover-title"></h2>
+          <p id="duel-score" class="big"></p>
+          <nav class="menu">
+            <button type="button" class="btn primary" data-action="duel-again" data-autofocus>Nog een keer</button>
+            <button type="button" class="btn" data-action="duel">Andere spelers</button>
+            <button type="button" class="btn" data-action="menu">Hoofdmenu</button>
+          </nav>
+        </div>
+      </section>
+
+      <!-- Pauze -->      <section id="screen-pause" class="screen" aria-labelledby="pause-title" hidden>
         <div class="panel">
           <h2 id="pause-title">Pauze</h2>
           <nav class="menu" aria-label="Pauzemenu">

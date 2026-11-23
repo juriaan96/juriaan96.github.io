@@ -1,4 +1,5 @@
 import {
+  COLS,
   ROW_START,
   ROW_FINISH,
   ROW_MEDIAN,
@@ -21,21 +22,31 @@ const GLIMPSE_FADE_OUT = 0.15;
 const LEVEL_CLEAR_PAUSE = 1.6;
 const LEVEL_BANNER = 1.3;
 const MAX_QUEUED_MOVES = 2;
+const DUEL_HIT_PAUSE = 1.0; // samen spelen: zo lang ligt een geraakte speler plat
+const DUEL_WIN_PAUSE = 1.8; // feestje voordat het winnaarsscherm komt
+const DUEL_START_COLS = [3, 9];
 
 /**
- * Spelstatus: 'ready' | 'playing' | 'hit' | 'levelclear' | 'gameover'.
+ * Spelstatus: 'ready' | 'playing' | 'hit' | 'levelclear' | 'gameover' | 'duelwon' | 'duelover'.
+ * Modus: 'normal' | 'noncha' | 'duel' (samen spelen: twee spelers, wie het eerst overstaat wint).
  * In 'ready' rijdt alleen het verkeer (achtergrond van het menu).
  * Pauze staat los daarvan (this.paused), zodat hervatten terugkeert naar dezelfde status.
  *
  * onEvent(type, data) meldt gebeurtenissen voor geluid en trillen:
- * 'levelstart', 'step', 'blocked', 'median', 'start', 'finish', 'hit', 'gameover'.
+ * 'levelstart', 'step', 'blocked', 'median', 'start', 'finish', 'hit', 'gameover', 'duelwin'.
+ * In samen spelen bevat data.player de index van de speler (0 of 1).
  */
 export class Game {
-  constructor({ onGameOver = () => {}, onEvent = () => {} } = {}) {
+  constructor({ onGameOver = () => {}, onEvent = () => {}, onDuelOver = () => {} } = {}) {
     this.onGameOver = onGameOver;
+    this.onDuelOver = onDuelOver;
     this.onEvent = onEvent;
     this.traffic = new Traffic();
     this.player = new Player();
+    this.player2 = new Player();
+    this.players = [this.player];
+    this.wins = [0, 0];
+    this.winner = -1;
     this.mode = 'normal';
     this.level = 1;
     this.score = 0;
@@ -50,6 +61,7 @@ export class Game {
     this.glimpseClock = 0;
     this.furthestRow = ROW_START;
     this.moves = [];
+    this.moves2 = [];
     this.hitBy = null;
     this.message = null;
     this.messageTimer = 0;
@@ -64,7 +76,6 @@ export class Game {
     return this.mode === 'noncha' ? NONCHA_MULTIPLIER : 1;
   }
 
-  /** Noncha: het speelveld is zwart, behalve tijdens de onthulling na een aanrijding. */
   /**
    * Noncha: hoe donker het speelveld is (1 = helemaal zwart, 0 = zichtbaar).
    * Met glimpseEvery > 0 is het veld elke glimpseEvery seconden een halve seconde te zien
@@ -94,9 +105,21 @@ export class Game {
     this.messageTimer = duration;
   }
 
-  newGame(mode = 'normal') {
+  /**
+   * @param {string} mode 'normal' | 'noncha' | 'duel'
+   * @param {object} [opts] duel: { level: verkeersdrukte, resetWins: stand op 0 }
+   */
+  newGame(mode = 'normal', opts = {}) {
     this.mode = mode;
-    this.level = 1;
+    this.level = opts.level || 1;
+    if (mode === 'duel') {
+      this.players = [this.player, this.player2];
+      DUEL_START_COLS.forEach((col, i) => (this.players[i].startCol = col));
+      if (opts.resetWins) this.wins = [0, 0];
+    } else {
+      this.players = [this.player];
+      this.player.startCol = Math.floor(COLS / 2);
+    }
     this.score = 0;
     this.maxLives = mode === 'noncha' ? NONCHA_LIVES : START_LIVES;
     this.lives = this.maxLives;
@@ -105,8 +128,10 @@ export class Game {
   }
 
   startLevel() {
-    this.traffic.reset(this.level, this.mode);
-    this.player.reset();
+    this.traffic.reset(this.level, this.mode === 'duel' ? 'normal' : this.mode);
+    for (const p of this.players) p.reset();
+    this.moves2 = [];
+    this.winner = -1;
     this.furthestRow = ROW_START;
     this.crossTime = 0;
     this.glimpseClock = 0;
@@ -114,7 +139,9 @@ export class Game {
     this.hitBy = null;
     this.state = 'playing';
     this.setMessage(
-      { title: `Level ${this.level}`, text: `Maximaal ${this.params.speedLimit} km/u`, toast: true },
+      this.mode === 'duel'
+        ? { title: 'Klaar? Lopen!', text: 'Wie het eerst aan de overkant is, wint', toast: true }
+        : { title: `Level ${this.level}`, text: `Maximaal ${this.params.speedLimit} km/u`, toast: true },
       LEVEL_BANNER,
     );
     this.onEvent('levelstart', { level: this.level });
@@ -122,9 +149,13 @@ export class Game {
 
   // --- Invoer -------------------------------------------------------------
 
-  handleMove(dx, dy) {
-    if (this.paused) return;
-    if (this.state === 'playing' && this.moves.length < MAX_QUEUED_MOVES) this.moves.push([dx, dy]);
+  /** @param {number} who speler (0 of 1); alleen in samen spelen van belang */
+  handleMove(dx, dy, who = 0) {
+    if (this.paused || this.state !== 'playing') return;
+    const queue = who === 1 && this.mode === 'duel' ? this.moves2 : this.moves;
+    const p = this.players[who] || this.player;
+    if (p.hitTimer > 0) return;
+    if (queue.length < MAX_QUEUED_MOVES) queue.push([dx, dy]);
   }
 
   get active() {
@@ -135,6 +166,7 @@ export class Game {
     if (!this.active) return;
     this.paused = !this.paused;
     this.moves = [];
+    this.moves2 = [];
   }
 
   pause() {
@@ -157,6 +189,7 @@ export class Game {
     this.paused = false;
     this.state = 'ready';
     this.moves = [];
+    this.moves2 = [];
     this.setMessage(null);
   }
 
@@ -168,7 +201,7 @@ export class Game {
     // Noncha: tijdens de onthulling staat het verkeer stil, zodat je ziet wat je raakte.
     const frozen = this.state === 'hit' && this.mode === 'noncha';
     if (!frozen) this.traffic.update(dt);
-    this.player.update(dt);
+    for (const p of this.players) p.update(dt);
 
     if (this.messageTimer > 0) {
       this.messageTimer -= dt;
@@ -177,7 +210,15 @@ export class Game {
 
     switch (this.state) {
       case 'playing':
-        this.updatePlaying(dt);
+        if (this.mode === 'duel') this.updateDuel(dt);
+        else this.updatePlaying(dt);
+        break;
+      case 'duelwon':
+        this.timer -= dt;
+        if (this.timer <= 0) {
+          this.state = 'duelover';
+          this.onDuelOver({ winner: this.winner, wins: this.wins.slice() });
+        }
         break;
       case 'hit':
         this.timer -= dt;
@@ -224,6 +265,54 @@ export class Game {
     const [xMin, xMax] = this.player.hitbox();
     const vehicle = this.traffic.hitTest(this.player.row, xMin, xMax);
     if (vehicle) this.hit(vehicle);
+  }
+
+  // --- Samen spelen ----------------------------------------------------------
+
+  updateDuel(dt) {
+    this.crossTime += dt;
+    for (let i = 0; i < this.players.length && this.state === 'playing'; i++) {
+      const p = this.players[i];
+      const queue = i === 1 ? this.moves2 : this.moves;
+      if (p.hitTimer > 0) {
+        p.hitTimer -= dt;
+        if (p.hitTimer <= 0) p.reset(); // terug naar de start
+        continue;
+      }
+      if (queue.length && p.cooldown <= 0) {
+        const [dx, dy] = queue.shift();
+        if (p.tryMove(dx, dy)) {
+          if (p.row === ROW_MEDIAN) this.onEvent('median', { player: i });
+          else if (p.row !== ROW_FINISH) this.onEvent('step', { player: i });
+        } else {
+          this.onEvent('blocked', { player: i });
+        }
+      }
+      if (p.row === ROW_FINISH) {
+        this.duelWin(i);
+        return;
+      }
+      const [xMin, xMax] = p.hitbox();
+      const vehicle = this.traffic.hitTest(p.row, xMin, xMax);
+      if (vehicle) {
+        p.hitTimer = p.hitDuration = DUEL_HIT_PAUSE;
+        p.hitStyle = vehicle.type === 'truck' || vehicle.type === 'van' ? 'flat' : 'spin';
+        const lane = this.traffic.laneByRow.get(p.row);
+        p.hitDir = lane ? lane.dir : 1;
+        queue.length = 0;
+        this.onEvent('hit', { vehicle, player: i });
+      }
+    }
+  }
+
+  duelWin(i) {
+    this.winner = i;
+    this.wins[i] += 1;
+    this.state = 'duelwon';
+    this.timer = DUEL_WIN_PAUSE;
+    this.moves = [];
+    this.moves2 = [];
+    this.onEvent('duelwin', { player: i });
   }
 
   hit(vehicle) {

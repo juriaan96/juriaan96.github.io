@@ -1,13 +1,6 @@
-const KEY_DIRS = {
-  ArrowUp: [0, -1],
-  ArrowDown: [0, 1],
-  ArrowLeft: [-1, 0],
-  ArrowRight: [1, 0],
-  KeyW: [0, -1],
-  KeyS: [0, 1],
-  KeyA: [-1, 0],
-  KeyD: [1, 0],
-};
+// Twee sets toetsen: in samen spelen is W A S D speler 1 en zijn de pijltjes speler 2.
+const ARROWS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+const WASD = { KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] };
 
 const SWIPE_MIN_PX = 20;
 
@@ -16,7 +9,8 @@ const SWIPE_MIN_PX = 20;
  * Het toetsenbord wordt doorgegeven door main.js (handleKey), zodat menu's en spel elkaars
  * toetsen niet afvangen. Swipes tellen alleen als isEnabled() true is.
  *
- * handlers: { onMove(dx, dy), onPause(), onWhere(), onTap(clientX, clientY, pointerType) }
+ * handlers: { onMove(dx, dy, source), onPause(), onWhere(), onTap(clientX, clientY, pointerType) }
+ * source = 'wasd' | 'arrows' | { x } (startpunt van een swipe), zodat samen spelen weet welke speler het is.
  * Een korte aanraking zonder beweging is een tik (onTap); een veeg is een swipe (onMove).
  */
 export class Input {
@@ -41,11 +35,16 @@ export class Input {
   /** Geeft true terug als de toets door het spel is gebruikt. */
   handleKey(e) {
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
-    const dir = KEY_DIRS[e.code] || KEY_DIRS[e.key];
+    let source = 'wasd';
+    let dir = WASD[e.code];
+    if (!dir) {
+      dir = ARROWS[e.code] || ARROWS[e.key];
+      source = 'arrows';
+    }
     if (dir) {
       e.preventDefault();
       // Ingedrukt houden laat de speler niet doorlopen: één stap per aanslag.
-      if (!e.repeat) this.handlers.onMove(dir[0], dir[1]);
+      if (!e.repeat) this.handlers.onMove(dir[0], dir[1], source);
       return true;
     }
     if (!e.repeat && (e.code === 'Escape' || e.code === 'KeyP')) {
@@ -78,7 +77,8 @@ export class Input {
       if (this.handlers.onTap) this.handlers.onTap(e.clientX, e.clientY, e.pointerType);
       return;
     }
-    if (Math.abs(dx) > Math.abs(dy)) this.handlers.onMove(Math.sign(dx), 0);
-    else this.handlers.onMove(0, Math.sign(dy));
+    const source = { x: start.x };
+    if (Math.abs(dx) > Math.abs(dy)) this.handlers.onMove(Math.sign(dx), 0, source);
+    else this.handlers.onMove(0, Math.sign(dy), source);
   }
 }

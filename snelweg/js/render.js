@@ -43,6 +43,9 @@ function fillRound(ctx, x, y, w, h, r, color) {
   ctx.fill();
 }
 
+/** Kleuren van speler 1 en 2 in samen spelen (bolletje boven het hoofd, HUD). */
+export const PLAYER_COLORS = ['#2563eb', '#ea580c'];
+
 const easeOut = (t) => 1 - (1 - t) * (1 - t);
 const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -161,7 +164,7 @@ export class Renderer {
       for (const v of lane.vehicles) this.drawVehicle(v, lane);
     }
     if (game.mode === 'noncha' && game.state === 'hit' && game.hitBy) this.drawReveal(game);
-    if (game.state !== 'ready' && game.state !== 'gameover') this.drawPlayer(game);
+    if (game.state !== 'ready' && game.state !== 'gameover') this.drawPlayers(game);
     this.drawParticles(game.paused ? 0 : dt);
     this.drawTapMarker(dt);
 
@@ -333,15 +336,29 @@ export class Renderer {
     ctx.fillRect(0.04, -0.07, 0.06, 0.14);
   }
 
-  drawPlayer(game) {
+  /** Aanrijding van deze speler: { k: 0..1, style, dir } of null. */
+  hitInfo(game, p) {
+    if (game.mode === 'duel') {
+      if (!(p.hitTimer > 0)) return null;
+      return { k: Math.min(1, Math.max(0, 1 - p.hitTimer / p.hitDuration)), style: p.hitStyle, dir: p.hitDir };
+    }
+    if (game.state !== 'hit') return null;
+    return { k: this.hitProgress(game), style: game.hitStyle, dir: game.hitDir };
+  }
+
+  drawPlayers(game) {
+    game.players.forEach((p, i) => this.drawPlayer(game, p, game.mode === 'duel' ? i : -1));
+  }
+
+  /** @param {number} badge -1 = geen; 0/1 = bolletje "1"/"2" boven het hoofd (samen spelen) */
+  drawPlayer(game, p, badge = -1) {
     const ctx = this.ctx;
-    const p = game.player;
     const look = p.look;
     const t = easeOut(p.moveT);
     let x = lerp(p.fromCol, p.col, t) + 0.5;
     let y = lerp(p.fromRow, p.row, t) + 0.5;
     const hop = Math.sin(p.moveT * Math.PI) * 0.12;
-    const hit = game.state === 'hit';
+    const hit = this.hitInfo(game, p);
 
     // Knipperen na het (her)verschijnen
     if (!hit && p.flash > 0 && Math.floor(p.flash * 12) % 2 === 1) return;
@@ -349,15 +366,15 @@ export class Renderer {
     ctx.save();
     ctx.translate(x, y);
     if (hit) {
-      const k = this.hitProgress(game);
-      if (game.hitStyle === 'spin' && !this.reducedMotion) {
+      const k = hit.k;
+      if (hit.style === 'spin' && !this.reducedMotion) {
         // Wegtollen in de rijrichting van het voertuig, met een boogje omhoog.
-        const dx = game.hitDir * easeOut(Math.min(1, k * 1.6)) * 1.3;
+        const dx = hit.dir * easeOut(Math.min(1, k * 1.6)) * 1.3;
         const dy = -Math.sin(Math.min(1, k * 1.6) * Math.PI) * 0.6;
         ctx.translate(dx, dy);
         x += dx;
         y += dy;
-        ctx.rotate(game.hitDir * Math.min(1, k * 1.6) * Math.PI * 3);
+        ctx.rotate(hit.dir * Math.min(1, k * 1.6) * Math.PI * 3);
         const s = 1 - 0.3 * Math.min(1, k * 1.6);
         ctx.scale(s, s);
         drawCharacter(ctx, look, { hit: true, flat: 0, face: p.face, shadow: false });
@@ -379,7 +396,24 @@ export class Renderer {
     }
     ctx.restore();
 
-    if (hit) this.drawHitEffect(x, y, game);
+    if (badge >= 0 && !hit) this.drawBadge(x, y - hop, badge);
+    if (hit) this.drawHitEffect(x, y, game, hit.k);
+  }
+
+  /** Samen spelen: gekleurd bolletje met 1 of 2 boven het hoofd. */
+  drawBadge(x, y, i) {
+    const ctx = this.ctx;
+    const by = y - 0.62;
+    ctx.save();
+    ctx.fillStyle = PLAYER_COLORS[i];
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 0.04;
+    ctx.beginPath();
+    ctx.arc(x, by, 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    this.text(String(i + 1), x, by + 0.01, 0.2, '#ffffff', 900);
   }
 
   /** 0 = moment van de aanrijding … 1 = einde van de aanrijdingspauze. */
@@ -387,8 +421,7 @@ export class Renderer {
     return Math.min(1, Math.max(0, 1 - game.timer / (game.hitDuration || 1)));
   }
 
-  drawHitEffect(x, y, game) {
-    const k = this.hitProgress(game);
+  drawHitEffect(x, y, game, k) {
     // Sterretjes die rondtollen
     for (let i = 0; i < 5; i++) {
       const a = game.time * 5 + (i * Math.PI * 2) / 5;
@@ -403,7 +436,6 @@ export class Renderer {
     this.text('AU!', x + 0.03, ay + 0.03, size, '#000000', 900);
     this.text('AU!', x, ay, size, '#ffd400', 900);
   }
-
   // --- Confetti bij de overkant ---------------------------------------------------------
 
   confetti(x, y) {

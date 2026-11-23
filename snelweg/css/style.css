@@ -1013,6 +1013,122 @@ html.smartboard .settings input[type='checkbox'] {
   }
 }
 
+/* --- Samen spelen ------------------------------------------------------------------ */
+
+.duel-players {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 0.75rem 0;
+  text-align: left;
+}
+
+@media (max-width: 560px) {
+  .duel-players {
+    grid-template-columns: 1fr;
+  }
+}
+
+.duel-label {
+  display: flex;
+  align-items: center;
+}
+
+.dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4em;
+  height: 1.4em;
+  margin-right: 0.4em;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 900;
+}
+
+.p1 .dot {
+  background: #2563eb;
+}
+
+.p2 .dot {
+  background: #ea580c;
+}
+
+.trophy {
+  margin: 0;
+  font-size: 3rem;
+}
+
+#hud-duel-score .p1 {
+  color: #60a5fa;
+}
+
+#hud-duel-score .p2 {
+  color: #fb923c;
+}
+
+#app.duel .hud-solo {
+  display: none;
+}
+
+/* Twee sets pijlknoppen: speler 1 links, speler 2 rechts */
+#app.duel .tc-side-left:not([hidden]) {
+  display: grid;
+}
+
+#app.duel .tc-side-left .tc {
+  border-color: #2563eb;
+}
+
+#app.duel #touch-controls .tc {
+  border-color: #ea580c;
+}
+
+@media (orientation: portrait) {
+  #app.duel {
+    --tc: 52px;
+  }
+  #app.duel .tc-side-left:not([hidden]) {
+    left: 14px;
+    right: auto;
+    transform: none;
+  }
+  #app.duel #touch-controls {
+    left: auto;
+    right: 14px;
+    transform: none;
+  }
+}
+
+@media (orientation: landscape) {
+  #app.duel .tc-side-left:not([hidden]) {
+    left: 14px;
+    left: max(14px, env(safe-area-inset-left));
+    right: auto;
+  }
+}
+
+/* Hoofdmenu op een lager scherm: knoppen in twee kolommen */
+@media (max-height: 680px) {
+  #screen-menu .menu {
+    grid-template-columns: 1fr 1fr;
+  }
+  #screen-menu .menu .btn.primary:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Veel menuknoppen op een smartboard met een lager scherm: twee kolommen */
+@media (max-height: 820px) {
+  html.smartboard #screen-menu .menu {
+    grid-template-columns: 1fr 1fr;
+  }
+  html.smartboard #screen-menu .menu .btn.primary:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Smartboard op een laag scherm (bijv. 1024×600): menu iets compacter zodat het past */
 @media (max-height: 700px) {
   html.smartboard .btn {

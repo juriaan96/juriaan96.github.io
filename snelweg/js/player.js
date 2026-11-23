@@ -3,15 +3,21 @@ import { DEFAULT_LOOK } from './character.js';
 
 export class Player {
   constructor() {
-    // Uiterlijk; wordt in stap 3 (poppetje maken) instelbaar.
     this.look = { ...DEFAULT_LOOK };
-    this.face = null; // data-URL van het eigen gezicht (stap 4)
+    this.face = null; // data-URL van het eigen gezicht
+    this.startCol = Math.floor(COLS / 2);
     this.reset();
   }
 
+  /** Terug naar de startberm (in "Samen spelen" heeft elke speler een eigen startkolom). */
   reset() {
-    this.col = Math.floor(COLS / 2);
+    this.col = this.startCol;
     this.row = ROW_START;
+    // Aanrijding per speler (alleen gebruikt in "Samen spelen")
+    this.hitTimer = 0;
+    this.hitDuration = 1;
+    this.hitStyle = 'flat';
+    this.hitDir = 1;
     this.fromCol = this.col;
     this.fromRow = this.row;
     this.moveT = 1;
