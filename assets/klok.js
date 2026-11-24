@@ -139,19 +139,18 @@ K.H = {
 /* ---------- radiozenders (openbare livestreams) ---------- */
 const STW = 'https://playerservices.streamtheworld.com/api/livestream-redirect/';
 K.stations = [
-  ['NPO Radio 1', 'https://icecast.omroep.nl/radio1-bb-mp3'],
   ['NPO Radio 2', 'https://icecast.omroep.nl/radio2-bb-mp3'],
   ['NPO 3FM', 'https://icecast.omroep.nl/3fm-bb-mp3'],
-  ['NPO Klassiek', 'https://icecast.omroep.nl/radio4-bb-mp3'],
   ['NPO Radio 5', 'https://icecast.omroep.nl/radio5-bb-mp3'],
   ['Qmusic', 'https://stream.qmusic.nl/qmusic/mp3'],
+  ['JOE', 'https://stream.joe.nl/joe/mp3'],
   ['Radio 538', STW + 'RADIO538.mp3'],
   ['Sky Radio', STW + 'SKYRADIO.mp3'],
   ['Radio 10', STW + 'RADIO10.mp3'],
   ['Radio Veronica', STW + 'VERONICA.mp3'],
   ['100% NL', 'https://stream.100p.nl/100pctnl.mp3'],
   ['SLAM!', 'https://stream.slam.nl/slam_mp3'],
-  ['Sublime', STW + 'SUBLIME.mp3']
+  ['Metal Express Radio', 'https://s39.myradiostream.com/11590/listen.mp3']
 ];
 
 /* ---------- pagina bouwen ---------- */
@@ -245,8 +244,11 @@ function run(T, auto, base) {
     const w = window.innerWidth, h = window.innerHeight;
     const fitMode = w / h >= 1.2 && w >= 700 && h >= 500;
     root.classList.toggle('fit', fitMode);
-    const tr = fitMode ? 'scale(' + Math.min(w / 1600, h / 1000).toFixed(4) + ')' : '';
+    const sc = Math.min(w / 1600, h / 1000);
+    const tr = fitMode ? 'scale(' + sc.toFixed(4) + ')' : '';
     app.style.webkitTransform = tr; app.style.transform = tr;
+    /* titel onder de knoppen bovenin houden (knoppen: 14px + 44px hoog, plus 12px lucht) */
+    if (fitMode) root.style.setProperty('--topPad', Math.max(26, Math.ceil((70 - (h - 1000 * sc) / 2) / sc - 24)) + 'px');
   }
   layout();
 
@@ -480,7 +482,8 @@ function run(T, auto, base) {
   const rBtn = $('radio'), rSel = $('station'), radio = new Audio();
   radio.preload = 'none';
   let radioOn = false;
-  try { const sv = localStorage.getItem('klok-zender'); if (sv !== null && K.stations[+sv]) rSel.value = sv; } catch (e) { /* geen opslag */ }
+  /* opgeslagen zender op naam terugzoeken (oude opslag gebruikte het volgnummer: dat negeren) */
+  try { const i = K.stations.findIndex(st => st[0] === localStorage.getItem('klok-zendernaam')); if (i >= 0) rSel.value = String(i); } catch (e) { /* geen opslag */ }
   function rLabel(txt, on) { rBtn.textContent = txt; rBtn.classList.toggle('on', !!on); }
   function radioPlay() {
     const st = K.stations[+rSel.value] || K.stations[0];
@@ -501,7 +504,7 @@ function run(T, auto, base) {
   radio.addEventListener('error', () => { if (radioOn) { radioOn = false; rLabel('Zender niet bereikbaar'); } });
   rBtn.addEventListener('click', e => { if (radioOn) radioStop(); else radioPlay(); if (e.detail > 0) rBtn.blur(); });
   rSel.addEventListener('change', () => {
-    try { localStorage.setItem('klok-zender', rSel.value); } catch (e) { /* geen opslag */ }
+    try { localStorage.setItem('klok-zendernaam', K.stations[+rSel.value][0]); } catch (e) { /* geen opslag */ }
     if (radioOn) radioPlay();
   });
 
