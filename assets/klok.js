@@ -347,6 +347,15 @@ function run(T, auto, base) {
     { name: 'de scheepsbel', play(n, out) { for (let i = 0; i < n; i++) bell(Math.floor(i / 2) * 1.4 + (i % 2) * 0.35, 1180, 0.22, out); } },
     { name: 'de wekker', onlyClick: true, play(n, out) { for (let i = 0; i < 24; i++) tone(i * 0.09, i % 2 ? 2350 : 2650, 0.12, 0.08, out, null, 'square'); } }
   ];
+  /* pauzemomenten: dan gaat een van de bekende klokken af */
+  const BELL_TIMES = [[9, 0], [10, 30], [12, 15], [14, 30], [16, 15]];
+  const testBell = /[?&]bel\b/.test(location.search);
+  function isBellTime(now) {
+    const d = now.getDay(), h = now.getHours(), m = now.getMinutes();
+    if (testBell) return true;
+    if (d === 0 || d === 6 || vacationState(now).cur) return false;
+    return BELL_TIMES.some(t => t[0] === h && t[1] === m);
+  }
   let lastChime = -1, clickG = null;
   const testChime = /[?&]uurslag/.test(location.search);
   function famousChime(n, out, short) {
@@ -571,7 +580,10 @@ function run(T, auto, base) {
       tEl.setAttribute('datetime', `${pad(h)}:${pad(m)}:${pad(s)}`);
       if (soundOn) {
         burst(s % 2 ? 2600 : 3400, 6, T.camp ? 0.15 : 0.5, 0.035, 0);
-        if ((s === 0 && m === 0) || (testChime && s === 0)) {
+        if (s === 0 && isBellTime(now)) {
+          const who = famousChime(3, master, true);
+          say(`${cap(who)} gaat af: het is ${h}:${pad(m)}!`, C.cx + 90, C.cy, 6000, 'l');
+        } else if ((s === 0 && m === 0) || (testChime && s === 0)) {
           const n = h % 12 || 12;
           const who = famousChime(n, master);
           say(`${cap(who)} slaat ${n} uur!`, C.cx + 90, C.cy, 5000, 'l');
